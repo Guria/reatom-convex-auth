@@ -1,18 +1,17 @@
 import type { PaginationResult } from 'convex/server'
 
 import { atom, context, wrap } from '@reatom/core'
-import { ConvexClient } from 'convex/browser'
-import { makeFunctionReference } from 'convex/server'
-import { ConvexError } from 'convex/values'
-import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test'
-
 import {
 	createFakeConvexServer,
 	fakeJwt,
 	paginate,
 	readFakeJwt,
 	type FakeConvexServer,
-} from '#shared/mocks/fakeConvexServer'
+} from 'convex-fake-server'
+import { ConvexClient } from 'convex/browser'
+import { makeFunctionReference } from 'convex/server'
+import { ConvexError } from 'convex/values'
+import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test'
 
 import { reatomConvex } from './reatomConvex'
 

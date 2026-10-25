@@ -100,7 +100,7 @@ and `convex/auth.config.ts` lists a single provider. better-auth is mounted at
 
 ## Compared with convex/react
 
-The binding in `src/shared/api/convex/reatomConvex.ts` covers what the
+The binding in `packages/reatom-convex/src/reatomConvex.ts` covers what the
 official React hooks do. It keeps the state in atoms, so routes, loaders and
 tests can read it without a component tree.
 
@@ -141,7 +141,7 @@ For fast feedback on staged files, prefer `hk check` / `hk fix`.
 
 `validate` never touches a real backend. Stories and unit tests run the real
 Convex client against an in-process server that speaks Convex's websocket
-protocol (`src/shared/mocks/fakeConvexServer.ts`, with app data in
+protocol (`packages/convex-fake-server/src/fakeConvexServer.ts`, with app data in
 `convexBackend.ts`). better-auth's real client talks to MSW handlers, and
 `convex-test` covers the backend functions.
 With `convex:dev` and `dev` running, two more checks hit the real thing:

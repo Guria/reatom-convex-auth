@@ -1,8 +1,8 @@
 // The binding side of the size apps: the same models whatever renders them.
 import { clearStack, context, wrap } from '@reatom/core'
 import { ConvexClient } from 'convex/browser'
+import { reatomConvex } from 'reatom-convex'
 
-import { reatomConvex } from '../../src/shared/api/convex/reatomConvex'
 import { addNoteFirst, api } from '../api'
 
 clearStack()

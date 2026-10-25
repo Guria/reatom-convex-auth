@@ -1,0 +1,15 @@
+{
+	"name": "convex-fake-server",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/fakeConvexServer.ts"
+	},
+	"devDependencies": {
+		"convex": "1.48.0"
+	},
+	"peerDependencies": {
+		"convex": "^1.48.0"
+	}
+}

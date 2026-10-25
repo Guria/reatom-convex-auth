@@ -174,7 +174,7 @@ beforeEach: ({ msw }) => msw.use(connectionList.error),
 
 Convex talks over a websocket that MSW cannot intercept, so each story gets an
 in-memory deployment (`src/shared/mocks/convexBackend.ts`) on a server that
-speaks Convex's websocket protocol (`fakeConvexServer.ts`). The decorator puts
+speaks Convex's websocket protocol (`packages/convex-fake-server`). The decorator puts
 a real `ConvexClient` connected to it into `convex.client`, plus
 `convexAuthTransport` and `betterAuthClient`, and closes the client when the
 story unmounts. better-auth still runs its real client: its HTTP endpoints are

@@ -37,10 +37,16 @@ export default defineConfig({
 			reportsDirectory: process.env['COVERAGE_DIR'] ?? '.var/coverage',
 			// Backend wiring (auth setup, routes, schema) is covered by `mise run
 			// convex:smoke`; the app-owned function logic is unit-tested here.
-			include: ['src/**/*.{ts,tsx}', 'convex/notes.ts', 'convex/viewer.ts'],
+			include: [
+				'src/**/*.{ts,tsx}',
+				'packages/reatom-convex/src/**/*.ts',
+				'packages/convex-fake-server/src/**/*.ts',
+				'convex/notes.ts',
+				'convex/viewer.ts',
+			],
 			exclude: [
 				'src/**/*.stories.tsx',
-				'src/**/*.test.{ts,tsx}',
+				'{src,packages}/**/*.test.{ts,tsx}',
 				'src/shared/styled-system/**',
 				'src/shared/components/ui/**',
 				'src/main.tsx',
@@ -52,7 +58,7 @@ export default defineConfig({
 				extends: true,
 				test: {
 					name: 'unit',
-					include: ['src/**/*.test.{ts,tsx}'],
+					include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.ts'],
 					exclude: ['src/**/*.stories.tsx'],
 					testTimeout: testTimeout,
 					hookTimeout: testTimeout,

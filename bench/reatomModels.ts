@@ -1,7 +1,7 @@
 import { context } from '@reatom/core'
 import { ConvexClient } from 'convex/browser'
+import { reatomConvex } from 'reatom-convex'
 
-import { reatomConvex } from '../src/shared/api/convex/reatomConvex'
 import { addNoteFirst, api, CLIENT_URL, type BenchServer, type Handle } from './fixture'
 
 /** The binding's models for one benchmark session, whatever renders them. */

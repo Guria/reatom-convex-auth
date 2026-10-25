@@ -1,17 +1,16 @@
 // In-memory stand-in for the Convex deployment in stories. The app's real
-// `ConvexClient` talks to it over a fake websocket (see fakeConvexServer.ts);
+// `ConvexClient` talks to it over a fake websocket (see convex-fake-server);
 // better-auth's HTTP endpoints are mocked with MSW so its real client and
 // cross-domain plugin run. Tokens are unsigned JWTs with the same claims the
 // real backend issues (convex/auth.ts, convex/betterAuth.ts).
 import type { AuthProviderId, ConvexAuthTransport } from '#shared/api'
 
+import { createFakeConvexServer, fakeJwt, paginate, readFakeJwt } from 'convex-fake-server'
 import { ConvexClient } from 'convex/browser'
 import { ConvexError } from 'convex/values'
 import { http, HttpResponse } from 'msw'
 
 import { BETTER_AUTH_BASE_PATH } from '#convex/authPaths'
-
-import { createFakeConvexServer, fakeJwt, paginate, readFakeJwt } from './fakeConvexServer'
 
 export const FAKE_CONVEX_SITE_URL = 'https://convex-site.test'
 

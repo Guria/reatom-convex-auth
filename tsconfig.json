@@ -1,6 +1,11 @@
 {
 	"files": [],
-	"references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+	"references": [
+		{ "path": "./tsconfig.app.json" },
+		{ "path": "./tsconfig.node.json" },
+		{ "path": "./packages/convex-fake-server" },
+		{ "path": "./packages/reatom-convex" }
+	],
 	"compilerOptions": {
 		"paths": {
 			"#styled-system/*": ["./src/shared/styled-system/*"],

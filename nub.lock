@@ -53,6 +53,9 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.3.1(react@19.3.1)
+      reatom-convex:
+        specifier: workspace:*
+        version: link:packages/reatom-convex
       zod:
         specifier: '4'
         version: 4.6.7
@@ -111,6 +114,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(@vitest/browser@4.1.10)(msw@2.15.0(typescript@6.0.2))(vitest@4.1.10)
+      convex-fake-server:
+        specifier: workspace:*
+        version: link:packages/convex-fake-server
       convex-test:
         specifier: 0.0.65
         version: 0.0.65(convex@1.48.0(react@19.3.1))
@@ -141,6 +147,27 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser@4.1.10)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/convex-fake-server:
+    devDependencies:
+      convex:
+        specifier: 1.48.0
+        version: 1.48.0(react@19.3.1)
+
+  packages/reatom-convex:
+    devDependencies:
+      '@reatom/core':
+        specifier: ^1001.3.0
+        version: 1001.3.0
+      convex:
+        specifier: 1.48.0
+        version: 1.48.0(react@19.3.1)
+      convex-fake-server:
+        specifier: workspace:*
+        version: link:../convex-fake-server
+      vite-plus:
+        specifier: ^0.2.8
+        version: 0.2.9(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10(playwright@1.64.1)(vitest@4.1.10))(@vitest/coverage-v8@4.1.10)(esbuild@0.28.2)(jiti@2.7.0)(msw@2.15.0(typescript@6.0.2))(typescript@6.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))
 
 packages:
 

@@ -84,7 +84,7 @@ checked; no frontend code changed in between.
       connection state. Proof: 11 unit tests in
       `src/shared/api/convex/reatomConvex.test.ts` against the real `ConvexClient`
 - [x] protocol-level fake server, so stories and unit tests run the real client
-      (`src/shared/mocks/fakeConvexServer.ts`)
+      (`packages/convex-fake-server/src/fakeConvexServer.ts`)
 - [x] app uses the new features: paginated notes with "Load more", optimistic
       add through `insertAtTop`, connection and refresh status. Proof:
       `src/app/integration/Sync.stories.tsx` (pagination, offline optimistic

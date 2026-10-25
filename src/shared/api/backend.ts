@@ -1,9 +1,9 @@
 import { assert, atom } from '@reatom/core'
 import { ConvexClient } from 'convex/browser'
+import { reatomConvex } from 'reatom-convex'
 
 import { createBetterAuthClient } from './auth/betterAuth'
 import { createConvexAuthTransport } from './auth/convexAuth'
-import { reatomConvex } from './convex/reatomConvex'
 
 // Read lazily: stories and tests set fakes into these atoms before first use.
 const env = (key: 'VITE_CONVEX_URL' | 'VITE_CONVEX_SITE_URL') => {

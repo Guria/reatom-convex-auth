@@ -1,4 +1,5 @@
-import { createFakeConvexServer, paginate } from '../src/shared/mocks/fakeConvexServer'
+import { createFakeConvexServer, paginate } from 'convex-fake-server'
+
 import { DATASET_SIZE, LIST_SIZE, type Note } from './api'
 
 export { addNoteFirst, api, LIST_SIZE } from './api'
