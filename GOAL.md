@@ -91,10 +91,10 @@ checked; no frontend code changed in between.
       add, token expiry), `mise run e2e:real` (pinned pages, load more after
       reload, both providers), `mise run convex:smoke`
 - [x] benchmark: `mise run bench` (runtime in Chromium on production builds,
-      bundle size), results in `bench/RESULTS.md`, analysis in `bench/README.md`.
+      bundle size), results in `packages/bench/RESULTS.md`, analysis in `packages/bench/README.md`.
       It found that `ConvexClient.onUpdate` is quadratic in subscriptions; the
       binding dispatches by query token instead (1000-query mount 268 → 77 ms)
 - [x] `mise run validate` green (exit 0, 67 tests)
 - [x] @reatom/jsx in the benchmark matrix: the same binding rendered without
-      React (`bench/reatomJsx.tsx`), runtime and bundle size. `mise run bench`
+      React (`packages/bench/reatomJsx.tsx`), runtime and bundle size. `mise run bench`
       passes with three columns.

@@ -58,7 +58,6 @@
 		"@inlang/paraglide-js": "^2.20.2",
 		"@pandacss/dev": "^1.11.4",
 		"@pandacss/studio": "^1.11.4",
-		"@reatom/jsx": "^1001.3.0",
 		"@storybook/addon-a11y": "~10.4.6",
 		"@storybook/addon-docs": "~10.4.6",
 		"@storybook/addon-vitest": "~10.4.6",

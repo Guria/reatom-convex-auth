@@ -1,5 +1,5 @@
 // Runtime benchmark: the same scenarios for each binding, each iteration on a
-// fresh fake server, client and container. `scripts/bench.ts` builds this page
+// fresh fake server, client and container. `run.ts` builds this page
 // in production mode and calls `runBenchmarks` from Playwright.
 import { clearStack } from '@reatom/core'
 

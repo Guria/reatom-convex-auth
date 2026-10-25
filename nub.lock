@@ -75,9 +75,6 @@ importers:
       '@pandacss/studio':
         specifier: ^1.11.4
         version: 1.12.1(@types/node@24.19.2)(@types/react@19.3.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(idb-keyval@6.3.0)(jiti@2.7.0)(typescript@6.0.2)
-      '@reatom/jsx':
-        specifier: ^1001.3.0
-        version: 1001.3.0(@reatom/core@1001.3.0)
       '@storybook/addon-a11y':
         specifier: ~10.4.6
         version: 10.4.6(@testing-library/dom@10.4.2)(react@19.3.1)(storybook@10.4.6(@types/react@19.3.0)(prettier@3.2.5))
@@ -147,6 +144,43 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser@4.1.10)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/bench:
+    dependencies:
+      '@reatom/core':
+        specifier: ^1001.3.0
+        version: 1001.3.0
+      '@reatom/jsx':
+        specifier: ^1001.3.0
+        version: 1001.3.0(@reatom/core@1001.3.0)
+      '@reatom/react':
+        specifier: ^1001.0.1
+        version: 1001.0.1(@reatom/core@1001.3.0)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))
+      convex:
+        specifier: 1.48.0
+        version: 1.48.0(react@19.3.1)
+      convex-fake-server:
+        specifier: workspace:*
+        version: link:../convex-fake-server
+      react:
+        specifier: ^19.2.7
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.3.1(react@19.3.1)
+      reatom-convex:
+        specifier: workspace:*
+        version: link:../reatom-convex
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^6.0.5
+        version: 6.1.2(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))
+      playwright:
+        specifier: ^1.61.1
+        version: 1.64.1
+      vite:
+        specifier: ^8.2.1
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)
 
   packages/convex-fake-server:
     devDependencies:

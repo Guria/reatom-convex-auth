@@ -126,7 +126,7 @@ binding's optimistic updates: the notes page adds notes through `insertAtTop`.
 come out within a few tenths of a millisecond. With 1000 subscriptions at
 once, @reatom/react takes 1.4× as long to mount and 2.3× to unmount;
 @reatom/jsx takes 1.2× for both and updates shared queries 4× faster. See
-[bench/README.md](bench/README.md).
+[packages/bench/README.md](packages/bench/README.md).
 
 ## Validation
 

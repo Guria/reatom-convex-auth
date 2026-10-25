@@ -2,34 +2,34 @@
 
 ```bash
 mise run bench            # print the report
-mise run bench --write    # save it to bench/RESULTS.md
+mise run bench --write    # save it to RESULTS.md
 ```
 
 [RESULTS.md](RESULTS.md) holds the latest numbers. This page explains them.
 
 ## How it runs
 
-`scripts/bench.ts` builds `bench/index.html` in production mode, with React's
+`run.ts` builds `index.html` in production mode, with React's
 profiling build so `<Profiler>` can count commits. It opens the page in
 Chromium with cross-origin isolation, which gives 5µs timers, and calls
 `runBenchmarks`. Three variants run the same scenarios: convex/react
-(`bench/official.tsx`), the binding rendered by @reatom/react
-(`bench/reatom.tsx`), and the same binding rendered by @reatom/jsx
-(`bench/reatomJsx.tsx`). Every iteration gets a fresh server, client and
+(`official.tsx`), the binding rendered by @reatom/react
+(`reatom.tsx`), and the same binding rendered by @reatom/jsx
+(`reatomJsx.tsx`). Every iteration gets a fresh server, client and
 container, and the start order rotates.
 
 @reatom/jsx publishes only the classic `h`/`hf` runtime; its `jsx-runtime`
 entry exports neither `jsx` nor `Fragment`. TypeScript reads the package's JSX
 types through a per-file `@jsxImportSource`, and the bench builds alias the
-runtime to `bench/reatomJsxRuntime.ts`, a three-line adapter over `h`.
+runtime to `reatomJsxRuntime.ts`, a three-line adapter over `h`.
 
-The server is `src/shared/mocks/fakeConvexServer.ts`, running in the page. It
+The server is `packages/convex-fake-server`, running in the page. It
 speaks Convex's websocket protocol and answers on later macrotasks, so both
 clients do their normal work: JSON parsing, query set versions, optimistic
 layers. There is no network and no server-side query execution. That removes
 the noise both bindings would share and isolates what differs between them.
 
-Bundle sizes come from minified builds of `bench/size/*.tsx`. Each one is the
+Bundle sizes come from minified builds of `size/*.tsx`. Each one is the
 same small app: client, auth, connection state, a skippable query, an
 optimistic mutation and a paginated query.
 
@@ -81,7 +81,7 @@ a stack: about 1.5 ms per 1000 in Node, while 1000 `AbortController`s cost
 1. `withConnectHook` registers its cleanup through `abortVar.subscribe` and
    runs it through `abortVar.spawn`, so every disconnect builds two reasons and
    an extra frame. The binding uses its own `withSyncConnectHook`
-   (`src/shared/api/convex/withSyncConnectHook.ts`): the same `onConnect`
+   (`packages/reatom-convex/src/withSyncConnectHook.ts`): the same `onConnect`
    action with its abort scope, but the cleanup runs from a call hook on
    `onConnect.abort`, outside the aborted scope. That took unmount from 25.3
    to 21.6 ms.
@@ -103,7 +103,7 @@ subscriptions cost O(N²). Without React, 1000 `onUpdate` subscriptions took
 about 300 ms. `ConvexReactClient.watchQuery` took about 4 ms against the same
 server. The binding subscribes through `client.client` (`BaseConvexClient`)
 instead and dispatches by query token the way `ConvexReactClient` does
-(`watchQuery` in `src/shared/api/convex/reatomConvex.ts`). With `onUpdate`,
+(`watchQuery` in `packages/reatom-convex/src/reatomConvex.ts`). With `onUpdate`,
 the mount scenario took 268 ms.
 
 Paginated queries still go through `ConvexClient.onPaginatedUpdate_experimental`

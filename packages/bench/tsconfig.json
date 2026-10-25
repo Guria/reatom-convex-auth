@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"jsx": "react-jsx",
+		"composite": true,
+		"tsBuildInfoFile": "../../.var/local/ts/bench.tsbuildinfo"
+	},
+	"include": ["*.ts", "*.tsx", "size"]
+}

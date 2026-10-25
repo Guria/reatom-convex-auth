@@ -1,0 +1,21 @@
+{
+	"name": "bench",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@reatom/core": "^1001.3.0",
+		"@reatom/jsx": "^1001.3.0",
+		"@reatom/react": "^1001.0.1",
+		"convex": "1.48.0",
+		"convex-fake-server": "workspace:*",
+		"react": "^19.2.7",
+		"react-dom": "^19.2.7",
+		"reatom-convex": "workspace:*"
+	},
+	"devDependencies": {
+		"@vitejs/plugin-react": "^6.0.5",
+		"playwright": "^1.61.1",
+		"vite": "^8.2.1"
+	}
+}

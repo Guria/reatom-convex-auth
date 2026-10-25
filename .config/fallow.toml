@@ -1,17 +1,21 @@
-entry = ["scripts/**/*.ts", "bench/main.tsx", "bench/size/*.tsx", "bench/reatomJsxRuntime.ts"]
+entry = [
+	"scripts/**/*.ts",
+	"packages/bench/run.ts",
+	"packages/bench/main.tsx",
+	"packages/bench/size/*.tsx",
+	"packages/bench/reatomJsxRuntime.ts",
+]
 # `@typescript/native`: TypeScript 7 compiler, not imported by source.
 # `idb-keyval`: optional dependency of @reatom/core. The Storybook/Vite optimizer
 # eagerly analyzes its dynamic import, so the package must remain resolvable.
 # `storybook`: imported by the kahraman actor harness but never runs in production.
 # `@ark-ui/react`: consumed by the excluded generated Park UI component sources.
 # Steiger and its FSD plugin are loaded by the excluded tooling config and mise task.
-# `@reatom/jsx`: imported only by the benchmark (bench/), never by the app.
 # `zod`: pins zod 4 at the root of the hoisted tree; better-auth imports it
 # without declaring a nested copy, and steiger's zod 3 would win otherwise.
 ignoreDependencies = [
 	"@ark-ui/react",
 	"@feature-sliced/steiger-plugin",
-	"@reatom/jsx",
 	"@typescript/native",
 	"idb-keyval",
 	"steiger",

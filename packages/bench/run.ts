@@ -1,6 +1,6 @@
 // Benchmarks convex/react against the Reatom binding: runtime scenarios in
-// Chromium on production builds (bench/main.tsx), and minified bundle sizes of
-// equivalent apps (bench/size). `--write` saves the report to bench/RESULTS.md.
+// Chromium on production builds (main.tsx), and minified bundle sizes of
+// equivalent apps (size/). `--write` saves the report to RESULTS.md.
 import react from '@vitejs/plugin-react'
 import { writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -24,11 +24,10 @@ const config = {
 	warmup: Number(options.warmup),
 }
 
-const root = path.resolve(import.meta.dirname, '..')
-const benchDir = path.join(root, 'bench')
-const outDir = path.join(root, '.var/bench/runtime')
+const benchDir = import.meta.dirname
+const outDir = path.resolve(benchDir, '../../.var/bench/runtime')
 const OFFICIAL = 'convex/react'
-// See bench/reatomJsxRuntime.ts.
+// See reatomJsxRuntime.ts.
 const resolve = {
 	alias: [
 		{
@@ -198,7 +197,7 @@ ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} c
 Production builds run the same scenarios in one page for convex/react, the
 Reatom binding rendered by @reatom/react, and the same binding rendered by
 @reatom/jsx. Each iteration gets a fresh in-process Convex server
-(src/shared/mocks/fakeConvexServer.ts), client and container, and the start
+(packages/convex-fake-server), client and container, and the start
 order rotates. Times run from the action to the DOM change, median with the
 interquartile range. Renders count item component renders (for @reatom/jsx,
 recomputes of an item's bound value); commits count React commits. Both list
@@ -214,7 +213,7 @@ ${runtimeTable(results)}
 
 ## Bundle size
 
-Minified production builds of equivalent apps (bench/size): client, auth,
+Minified production builds of equivalent apps (packages/bench/size): client, auth,
 connection state, a skippable query, an optimistic mutation and a paginated
 query. Each app's Convex share is measured over its own baseline: React for
 convex/react, React + Reatom or Reatom + @reatom/jsx for the binding.

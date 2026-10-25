@@ -177,9 +177,9 @@ usage = '''
 flag "--items <n>" default="1000" help="Components in many-component scenarios"
 flag "--iterations <n>" default="15" help="Measured iterations per scenario"
 flag "--warmup <n>" default="3" help="Unmeasured iterations first"
-flag "--write" help="Save the report to bench/RESULTS.md"
+flag "--write" help="Save the report to packages/bench/RESULTS.md"
 '''
-run = "nub scripts/bench.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
+run = "nub packages/bench/run.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
 
 [tasks.storybook]
 description = "Start Storybook dev server"
