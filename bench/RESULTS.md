@@ -15,16 +15,16 @@ convex/react / reatom medians).
 
 | Scenario           |  convex/react ms |        reatom ms | reatom / official |     renders | commits |
 | ------------------ | ---------------: | ---------------: | ----------------: | ----------: | ------: |
-| mount              | 57.8 (57.3–58.8) | 76.9 (74.7–81.3) |             1.33× | 3000 / 2000 |   4 / 2 |
-| update all         | 3.43 (3.07–3.82) | 8.05 (7.40–9.21) |             2.35× | 1000 / 1000 |   1 / 1 |
-| update one         | 0.66 (0.60–0.73) | 0.80 (0.76–0.94) |             1.22× |       1 / 1 |   1 / 1 |
-| unmount            | 8.70 (8.55–9.10) | 25.3 (24.3–26.6) |             2.91× |           – |       – |
-| shared mount       | 7.54 (6.35–8.54) | 11.0 (10.4–13.0) |             1.45× | 3000 / 2000 |   3 / 2 |
-| shared update      | 2.31 (2.07–2.42) | 3.77 (3.20–4.73) |             1.63× | 1000 / 1000 |   1 / 1 |
-| optimistic shown   | 0.10 (0.09–0.13) | 0.14 (0.12–0.15) |             1.35× |           – |   1 / 1 |
-| mutation confirmed | 0.20 (0.18–0.24) | 0.27 (0.23–0.28) |             1.35× |           – |   2 / 2 |
-| first page         | 0.12 (0.11–0.13) | 0.17 (0.16–0.19) |             1.42× |           – |   3 / 3 |
-| load more          | 0.13 (0.12–0.14) | 0.11 (0.10–0.11) |             0.81× |           – |   3 / 2 |
+| mount              | 58.7 (58.1–59.3) | 77.8 (76.7–79.1) |             1.33× | 3000 / 2000 |   4 / 2 |
+| update all         | 3.42 (3.30–4.01) | 7.58 (7.30–8.39) |             2.22× | 1000 / 1000 |   1 / 1 |
+| update one         | 0.71 (0.64–0.84) | 0.82 (0.80–0.88) |             1.16× |       1 / 1 |   1 / 1 |
+| unmount            | 8.95 (8.62–9.13) | 20.1 (19.8–21.4) |             2.25× |           – |       – |
+| shared mount       | 7.69 (7.02–8.31) | 11.1 (10.8–12.9) |             1.44× | 3000 / 2000 |   3 / 2 |
+| shared update      | 2.30 (2.13–2.39) | 3.90 (3.53–4.76) |             1.70× | 1000 / 1000 |   1 / 1 |
+| optimistic shown   | 0.11 (0.10–0.13) | 0.14 (0.12–0.14) |             1.23× |           – |   1 / 1 |
+| mutation confirmed | 0.20 (0.18–0.23) | 0.26 (0.23–0.27) |             1.24× |           – |   2 / 2 |
+| first page         | 0.13 (0.12–0.14) | 0.17 (0.16–0.19) |             1.32× |           – |   3 / 3 |
+| load more          | 0.13 (0.12–0.14) | 0.10 (0.10–0.12) |             0.78× |           – |   3 / 2 |
 
 - mount, update all, update one, unmount: 1000 components, each with its own query. Unmount runs until the server holds no subscriptions.
 - shared mount, shared update: 1000 components reading one query.
@@ -43,4 +43,4 @@ binding's over React + Reatom, which an app using the binding already ships.
 | React              |   213.7 |     65.8 |       56.7 |                      |
 | React + Reatom     |   228.1 |     71.1 |       61.5 |                      |
 | convex/react app   |   288.2 |     86.7 |       74.9 |                +20.9 |
-| Reatom binding app |   306.6 |     93.3 |       81.0 |                +22.2 |
+| Reatom binding app |   306.9 |     93.4 |       81.0 |                +22.3 |

@@ -123,7 +123,7 @@ binding's optimistic updates: the notes page adds notes through `insertAtTop`.
 
 `mise run bench` measures both. Single queries, mutations and pagination come
 out within 0.1 ms of each other. With 1000 subscriptions at once, mounting
-takes 1.3× as long and unmounting 2.9×, mostly from Reatom's connect hooks.
+takes 1.3× as long and unmounting 2.3×, mostly from aborting Reatom scopes.
 See [bench/README.md](bench/README.md).
 
 ## Validation

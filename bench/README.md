@@ -32,25 +32,43 @@ The two are within a tenth of a millisecond on single queries, mutations,
 optimistic updates and pagination. The gaps show up only when 1000
 subscriptions start, stop or update at once.
 
-- **Mount 1000 queries: about 1.3× (+19 ms).** Most of this is Reatom's
-  `withConnectHook`. Every connection runs an abortable action and registers
-  its cleanup through `abortVar`, so each subscription creates an
-  `AbortController` plus a promise. Measured on its own, an empty connect hook
-  adds 3–17 ms per 1000 connects.
-- **Unmount 1000 queries: about 2.9× (+17 ms).** Same cause: disconnecting
-  aborts each of those controllers. An empty hook adds 11–19 ms per 1000
-  disconnects, which covers the whole gap.
-- **Update 1000 queries in one transition: about 2.3× (+4.6 ms).** That's
-  roughly 5µs per update for `wrap()`, the atom write and recompute, and the
+- **Mount 1000 queries: about 1.3× (+19 ms).** Each query model is several
+  atoms plus a connect action per subscription.
+- **Unmount 1000 queries: about 2.3× (+11 ms).** Most of it is aborting
+  Reatom scopes, see below.
+- **Update 1000 queries in one transition: about 2.2× (+4 ms).** That's
+  roughly 4µs per update for `wrap()`, the atom write and recompute, and the
   component notification.
 - **Fewer renders.** The binding renders each item twice on mount, against
   three times for `useQuery`, and commits half as often.
-- **Bundle: +1.3 KiB gzip** for the Convex part over convex/react's, in an app
+- **Bundle: +1.4 KiB gzip** for the Convex part over convex/react's, in an app
   that already ships Reatom. Without Reatom, add its 5.3 KiB.
 
-A Reatom app would only feel the connect-hook cost if it mounts or unmounts
-hundreds of subscriptions in one frame. A synchronous connect hook doesn't
-need an abort scope, so that overhead could be fixed in Reatom itself.
+None of this shows on a page with a few dozen queries. It matters only when
+hundreds of subscriptions start or stop in one frame.
+
+## Where unmount time goes
+
+Aborting a Reatom scope builds an abort reason, a `DOMException` that captures
+a stack: about 1.5 ms per 1000 in Node, while 1000 `AbortController`s cost
+0.02 ms. Two places do it per subscription:
+
+1. `withConnectHook` registers its cleanup through `abortVar.subscribe` and
+   runs it through `abortVar.spawn`, so every disconnect builds two reasons and
+   an extra frame. The binding uses its own `withSyncConnectHook`
+   (`src/shared/api/convex/withSyncConnectHook.ts`): the same `onConnect`
+   action with its abort scope, but the cleanup runs from a call hook on
+   `onConnect.abort`, outside the aborted scope. That took unmount from 25.3
+   to 21.6 ms.
+2. `reatomComponent` subscribes every component to `abortVar`, and
+   `abortVar.subscribe` detaches with `listenerController.abort()`, which
+   builds a default reason per component. The controller only removes a
+   listener; nobody reads that reason.
+
+Both are candidates for Reatom itself. Passing one shared, prebuilt reason in
+`abortVar.subscribe`'s unsubscribe (a one-line change) brought unmount to
+12.3 ms with the binding's hook and 13.3 ms with `withConnectHook`, measured
+by patching the installed `@reatom/core` for one run.
 
 ## What the binding avoids
 
