@@ -9,14 +9,27 @@ mise run bench --write    # save it to RESULTS.md
 
 ## How it runs
 
-`run.ts` builds `index.html` in production mode, with React's
-profiling build so `<Profiler>` can count commits. It opens the page in
-Chromium with cross-origin isolation, which gives 5µs timers, and calls
-`runBenchmarks`. Three variants run the same scenarios: convex/react
-(`official.tsx`), the binding rendered by @reatom/react
-(`reatom.tsx`), and the same binding rendered by @reatom/jsx
-(`reatomJsx.tsx`). Every iteration gets a fresh server, client and
-container, and the start order rotates.
+`run.ts` builds `index.html` in production mode, with React's profiling build
+so `<Profiler>` can count commits, once per Reatom build:
+
+- `stable`: the `@reatom/*` packages this package depends on.
+- `next`: the ones `packages/reatom-next` installs. Point its `package.json`
+  dependencies at another release or a pkg.pr.new preview to compare it.
+
+Reatom keeps global state, so a page never loads two copies. A Vite plugin
+resolves every `@reatom/core`, `@reatom/react` and `@reatom/jsx` import, the
+binding's and the adapters' included, from the build's package directory. It
+records the directories it used and fails on a second copy of a package; the
+report header lists the version of each from there. Each page also reports
+`@reatom/core`'s `VERSION`, which carries only the major.
+
+The runner opens each page in its own browser context, with cross-origin
+isolation for 5µs timers. Five columns run the same scenarios: convex/react
+(`official.tsx`, in the stable page), and the binding rendered by
+@reatom/react (`reatom.tsx`) and by @reatom/jsx (`reatomJsx.tsx`) in each
+build. Every iteration runs each scenario for all five columns, switching
+pages as it goes, and rotates which column starts. Every run gets a fresh
+server, client and container.
 
 @reatom/jsx publishes only the classic `h`/`hf` runtime; its `jsx-runtime`
 entry exports neither `jsx` nor `Fragment`. TypeScript reads the package's JSX
@@ -31,11 +44,12 @@ the noise both bindings would share and isolates what differs between them.
 
 Bundle sizes come from minified builds of `size/*.tsx`. Each one is the
 same small app: client, auth, connection state, a skippable query, an
-optimistic mutation and a paginated query.
+optimistic mutation and a paginated query. The Reatom apps and their baselines
+are built once per Reatom build.
 
 ## What the numbers say
 
-All three are within a few tenths of a millisecond on single queries,
+These are the stable build's numbers. All three are within a few tenths of a millisecond on single queries,
 mutations, optimistic updates and pagination. The gaps show up only when 1000
 subscriptions start, stop or update at once, and they depend more on the view
 layer than on the binding.

@@ -43,6 +43,8 @@ ignoreExports = [
 
 # Park UI and generated assets are committed vendor/generated code.
 ignorePatterns = [
+	# Only installs an alternative Reatom build; the benchmark resolves it by path.
+	"packages/reatom-next/**",
 	"public/mockServiceWorker.js",
 	"scripts/steiger/steiger.config.ts",
 	"src/paraglide/**",

@@ -203,6 +203,18 @@ importers:
         specifier: ^0.2.8
         version: 0.2.9(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10(playwright@1.64.1)(vitest@4.1.10))(@vitest/coverage-v8@4.1.10)(esbuild@0.28.2)(jiti@2.7.0)(msw@2.15.0(typescript@6.0.2))(typescript@6.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))
 
+  packages/reatom-next:
+    dependencies:
+      '@reatom/core':
+        specifier: 1001.2.0
+        version: 1001.2.0
+      '@reatom/jsx':
+        specifier: 1001.2.0
+        version: 1001.2.0(@reatom/core@1001.2.0)
+      '@reatom/react':
+        specifier: 1001.0.0
+        version: 1001.0.0(@reatom/core@1001.2.0)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))
+
 packages:
 
   '@adobe/css-tools@4.5.0':
@@ -2329,13 +2341,28 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
+  '@reatom/core@1001.2.0':
+    resolution: {integrity: sha512-7K3zSYKB7mWCzvmDXPkC65EPZNQ2owZ8whnOj4SnB2mZRP7Qt3O8hboIMfKIwNUDfhpKOsefneCF1dXGAJShxg==}
+
   '@reatom/core@1001.3.0':
     resolution: {integrity: sha512-M8pZM6sWIQLIJZVaMI//tqadppk5GHV1MMjDZ0q5g3yxF1sXQs5ftgAxnitxAlP/ViwYWKxyrQI/8q1A3DeaNA==}
+
+  '@reatom/jsx@1001.2.0':
+    resolution: {integrity: sha512-AFPcvTnClOHEU7UX5QRbew1CBhDAqS4g3VJ1uFcXXkS6Ia2aW8pwl88DazXXV7OMcLfBZREMYch5lyrFNpnJtg==}
+    peerDependencies:
+      '@reatom/core': ^1001.2.0
 
   '@reatom/jsx@1001.3.0':
     resolution: {integrity: sha512-JFJjALdYAcpNEANXrKZ3TWygc+ha2hdvLPEwn+Jj1nXSBhuxOB9p6NcBkpFRuKdHvJhgNDs11Q7tZN4Ld3cbtw==}
     peerDependencies:
       '@reatom/core': ^1001.3.0
+
+  '@reatom/react@1001.0.0':
+    resolution: {integrity: sha512-7UmxyJnv9KSmOnf7uHJrtTcG0/RtHjUIOY0is+R1oNeEfEl5dKAcuza6zOobm9ABTbZVvaEgsWkguoAYK8YJtQ==}
+    peerDependencies:
+      '@reatom/core': ^1001.0.0
+      react: '>=18.2.0'
+      react-dom: '>=18.2.0'
 
   '@reatom/react@1001.0.1':
     resolution: {integrity: sha512-xU5diWeNIrVmJs5a5G6RTPOAz3OhPTtT7iqswPKJs5tGEahf2tCWo25JKEALv79pG0eqTGGJ5W/k7llweOhe3g==}
@@ -7689,16 +7716,33 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
+  '@reatom/core@1001.2.0':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+    optionalDependencies:
+      idb-keyval: 6.3.0
+
   '@reatom/core@1001.3.0':
     dependencies:
       '@standard-schema/spec': 1.1.0
     optionalDependencies:
       idb-keyval: 6.3.0
 
+  '@reatom/jsx@1001.2.0(@reatom/core@1001.2.0)':
+    dependencies:
+      '@reatom/core': 1001.2.0
+      csstype: 3.2.3
+
   '@reatom/jsx@1001.3.0(@reatom/core@1001.3.0)':
     dependencies:
       '@reatom/core': 1001.3.0
       csstype: 3.2.3
+
+  '@reatom/react@1001.0.0(@reatom/core@1001.2.0)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))':
+    dependencies:
+      '@reatom/core': 1001.2.0
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
   '@reatom/react@1001.0.1(@reatom/core@1001.3.0)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))':
     dependencies:

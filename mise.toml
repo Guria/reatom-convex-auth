@@ -48,7 +48,7 @@ VITE_CONNECT_LOGGER = "false"
 
 [deps.nub]
 auto = true
-sources = ["nub.lock", "package.json"]
+sources = ["nub.lock", "package.json", "packages/*/package.json"]
 outputs = ["node_modules/.modules.yaml"]
 run = "nub install"
 

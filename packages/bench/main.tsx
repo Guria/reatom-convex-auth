@@ -1,7 +1,7 @@
-// Runtime benchmark: the same scenarios for each binding, each iteration on a
-// fresh fake server, client and container. `run.ts` builds this page
-// in production mode and calls `runBenchmarks` from Playwright.
-import { clearStack } from '@reatom/core'
+// Runtime benchmark: the same scenarios for each binding, each run on a fresh
+// fake server, client and container. `run.ts` builds this page once per Reatom
+// build in production mode and drives `window.bench` from Playwright.
+import { clearStack, VERSION } from '@reatom/core'
 
 import {
 	counters,
@@ -20,15 +20,8 @@ import { reatomJsx } from './reatomJsx'
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
 
-type Config = {
-	items: number
-	iterations: number
-	warmup: number
-	/** Labels and scenario names to run; all by default. */
-	only?: { bindings?: string[]; scenarios?: string[] }
-}
+type Config = { items: number }
 type Sample = { ms: number; renders: number; commits: number }
-type Results = Record<string, Record<string, Sample[]>>
 
 const allBindings = [official, reatom, reatomJsx]
 
@@ -137,46 +130,31 @@ const pagination: Scenario = (binding) =>
 		return { 'first page': first, 'load more': more }
 	})
 
-const allScenarios = { distinctQueries, sharedQuery, optimisticMutation, pagination }
-
-const selected = <T,>(entries: Array<[string, T]>, names: string[] | undefined) =>
-	entries.filter(([name]) => !names || names.includes(name)).map(([, value]) => value)
+const allScenarios: Record<string, Scenario> = {
+	distinctQueries,
+	sharedQuery,
+	optimisticMutation,
+	pagination,
+}
 
 // Without React there are no commits to count.
 const withCommits = (binding: Binding, sample: Sample): Sample =>
 	binding.commits ? sample : { ...sample, commits: Number.NaN }
 
-const record = (results: Results, binding: Binding, samples: Record<string, Sample>) => {
-	for (const [name, sample] of Object.entries(samples)) {
-		;((results[name] ??= {})[binding.label] ??= []).push(withCommits(binding, sample))
-	}
-}
-
-// Rotates which binding goes first.
-const orderFor = (iteration: number, bindings: Binding[]) => {
-	const shift = iteration % bindings.length
-	return [...bindings.slice(shift), ...bindings.slice(0, shift)]
-}
-
-async function runRound(config: Config, sink: Results, order: Binding[], scenarios: Scenario[]) {
-	const runs = scenarios.flatMap((scenario) => order.map((binding) => [scenario, binding] as const))
-	for (const [scenario, binding] of runs) record(sink, binding, await scenario(binding, config))
-}
-
-async function runBenchmarks(config: Config): Promise<Results> {
-	const results: Results = {}
-	const { bindings: bindingNames, scenarios: scenarioNames } = config.only ?? {}
-	const bindings = selected(
-		allBindings.map((binding) => [binding.label, binding]),
-		bindingNames,
+/** Runs one scenario for one binding; returns its samples by name. */
+async function runOnce(label: string, scenario: string, config: Config) {
+	const binding = allBindings.find((candidate) => candidate.label === label)
+	const runScenario = allScenarios[scenario]
+	if (!binding || !runScenario) throw new Error(`Unknown run: ${label}, ${scenario}`)
+	const samples = await runScenario(binding, config)
+	return Object.fromEntries(
+		Object.entries(samples).map(([name, sample]) => [name, withCommits(binding, sample)]),
 	)
-	const scenarios = selected(Object.entries(allScenarios), scenarioNames)
-	for (let iteration = 0; iteration < config.warmup + config.iterations; iteration++) {
-		// Warmup samples go to a throwaway record.
-		const sink = iteration >= config.warmup ? results : {}
-		await runRound(config, sink, orderFor(iteration, bindings), scenarios)
-	}
-	return results
 }
 
-Object.assign(window, { runBenchmarks })
+const bench = { version: VERSION, scenarios: Object.keys(allScenarios), run: runOnce }
+
+/** What `run.ts` calls as `window.bench`. */
+export type Bench = typeof bench
+
+Object.assign(window, { bench })
