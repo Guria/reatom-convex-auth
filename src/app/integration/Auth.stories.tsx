@@ -134,6 +134,7 @@ export const RestoresSession = meta.story({
 
 RestoresSession.test('waits for the backend to accept a stored session', async () => {
 	await I.waitExit(role('status', 'Checking session'))
-	await I.see(heading('Notes'))
+	// The notes route loader settles after the session does.
+	await I.see(heading('Notes').wait())
 	await I.see(text('Signed in with Convex Auth as alex@example.com').wait())
 })

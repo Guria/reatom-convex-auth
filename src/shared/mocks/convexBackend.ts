@@ -134,8 +134,10 @@ export function createFakeConvexBackend() {
 			later(notifyAll)
 			return note._id as FunctionReturnType<Mutation>
 		},
+		// Like the real client, calls fetchToken later from its own callback.
 		setAuth(fetchToken, onChange) {
-			void fetchToken({ forceRefreshToken: false }).then((token) => {
+			later(async () => {
+				const token = await fetchToken({ forceRefreshToken: false })
 				identity = token ? verify(token) : null
 				later(() => {
 					onChange(identity !== null)

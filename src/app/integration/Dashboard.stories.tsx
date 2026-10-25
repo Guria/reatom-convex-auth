@@ -154,6 +154,8 @@ HandlesDashboardLoadServerErrorMobile.test(
 export const KeepsLoadingWhenDashboardRequestNeverResolves = meta.story({
 	name: 'Dashboard Request Loading State',
 	beforeEach: ({ msw }) => msw.use(dashboardStats.loading),
+	// The dashboard request never settles; only the session check does.
+	play: () => I.waitExit(role('status', 'Checking session')),
 })
 
 KeepsLoadingWhenDashboardRequestNeverResolves.test(
@@ -167,6 +169,7 @@ export const KeepsLoadingWhenDashboardRequestNeverResolvesMobile = meta.story({
 	name: 'Dashboard Request Loading State (Mobile)',
 	globals: { viewport: { value: 'sm', isRotated: false } },
 	beforeEach: KeepsLoadingWhenDashboardRequestNeverResolves.input.beforeEach,
+	play: KeepsLoadingWhenDashboardRequestNeverResolves.input.play,
 })
 
 KeepsLoadingWhenDashboardRequestNeverResolvesMobile.test(

@@ -28,10 +28,12 @@ export const reatomConvex = (createTransport: () => ConvexTransport, name: strin
 	 */
 	const serverAuthenticated = atom<boolean | null>(null, `${name}.serverAuthenticated`)
 
+	// Convex calls both callbacks later from its websocket handlers (token
+	// refetch, server answer), outside any Reatom frame.
 	const setAuth = action((fetchToken: AuthTokenFetcher) => {
 		serverAuthenticated.set(null)
 		transport().setAuth(
-			fetchToken,
+			wrap(fetchToken),
 			wrap((isAuthenticated: boolean) => serverAuthenticated.set(isAuthenticated)),
 		)
 	}, `${name}.setAuth`)
