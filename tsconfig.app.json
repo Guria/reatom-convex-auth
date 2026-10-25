@@ -8,10 +8,11 @@
 		"composite": true,
 		"paths": {
 			"#.storybook/*": ["./.storybook/*"],
+			"#convex/*": ["./convex/*"],
 			"#styled-system/*": ["./src/shared/styled-system/*"],
 			"#*": ["./src/*"]
 		},
 		"tsBuildInfoFile": ".var/local/ts/app.tsbuildinfo"
 	},
-	"include": ["src", ".storybook/**/*"]
+	"include": ["src", ".storybook/**/*", "convex/authPaths.ts"]
 }

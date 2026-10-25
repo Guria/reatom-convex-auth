@@ -83,3 +83,14 @@ export const apiClient = {
 	post: <TResponse>(path: string, options?: Omit<RequestOptions, 'method'>) =>
 		request<TResponse>(path, { ...options, method: 'POST' }),
 }
+
+export { AUTH_PROVIDERS } from './auth/types'
+export type { AuthAdapter, AuthProviderId, Credentials } from './auth/types'
+export { createBetterAuthClient, reatomBetterAuthAdapter } from './auth/betterAuth'
+export {
+	convexAuthStorageKeys,
+	reatomConvexAuthAdapter,
+	type ConvexAuthTransport,
+} from './auth/convexAuth'
+export type { ConvexTransport } from './convex/transport'
+export { betterAuthClient, convex, convexAuthTransport } from './backend'
