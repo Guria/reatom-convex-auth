@@ -29,6 +29,8 @@ import {
 import { getFunctionName, makeFunctionReference } from 'convex/server'
 import { convexToJson, jsonToConvex, type Value } from 'convex/values'
 
+import { withSyncConnectHook } from './withSyncConnectHook'
+
 type QueryState<T> =
 	| { status: 'skipped' }
 	| { status: 'loading' }
@@ -137,7 +139,7 @@ const withSubscription = <Args extends object, T>(
 		const key = nextArgs === 'skip' ? 'skip' : argsKey(nextArgs)
 		return { client: client(), args: nextArgs, key }
 	}, `${name}.source`)
-	return withConnectHook(() => {
+	return withSyncConnectHook(() => {
 		let current: { client: ConvexClient; key: string; unsubscribe: () => void } | null = null
 		const unsubscribeSource = source.subscribe(({ client: nextClient, args: nextArgs, key }) => {
 			if (current?.client === nextClient && current.key === key) return
