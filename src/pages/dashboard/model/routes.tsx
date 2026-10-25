@@ -1,7 +1,7 @@
 import { retryComputed, wrap } from '@reatom/core'
 
-import { protectedRoute } from '#entities/auth'
 import { fetchDashboardData } from '#entities/dashboard'
+import { protectedRoute } from '#entities/session'
 import { m } from '#paraglide/messages.js'
 import { PageError } from '#widgets/data-page'
 

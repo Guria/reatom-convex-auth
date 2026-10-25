@@ -1,12 +1,12 @@
 import { urlAtom, withChangeHook } from '@reatom/core'
 import { reatomComponent } from '@reatom/react'
 
-import { isAuthenticatedAtom } from '#entities/auth'
-import { dashboardRoute } from '#pages/dashboard'
+import { sessionStatus } from '#entities/session'
 import { loginRoute } from '#pages/login'
 import { NotFoundPage } from '#pages/not-found'
+import { notesRoute } from '#pages/notes'
 import { m } from '#paraglide/messages.js'
-import { Toaster } from '#shared/components'
+import { Spinner, Toaster } from '#shared/components'
 import { documentTitleAtom, localeAtom } from '#shared/model'
 import { rootRoute } from '#shared/router'
 import { styled } from '#styled-system/jsx'
@@ -20,8 +20,8 @@ import { SidebarNavigation } from './SidebarNavigation'
 urlAtom.extend(
 	withChangeHook(() => {
 		if (rootRoute.exact()) {
-			if (isAuthenticatedAtom()) {
-				dashboardRoute.go(undefined, true)
+			if (sessionStatus() === 'authenticated') {
+				notesRoute.go(undefined, true)
 			} else {
 				loginRoute.go(undefined, true)
 			}
@@ -29,9 +29,31 @@ urlAtom.extend(
 	}),
 )
 
+// The client holds a session but the backend has not accepted its token yet:
+// neither the sign-in page nor private pages are the right owner.
+const CheckingSession = () => (
+	<styled.main
+		role="status"
+		aria-label={m.session_checking()}
+		minH="100dvh"
+		display="grid"
+		placeItems="center"
+	>
+		<Spinner />
+	</styled.main>
+)
+
 export const App = reatomComponent(() => {
 	localeAtom()
 	documentTitleAtom()
+	if (sessionStatus() === 'authenticating') {
+		return (
+			<>
+				<CheckingSession />
+				<Toaster />
+			</>
+		)
+	}
 	if (loginRoute.match()) {
 		return (
 			<>

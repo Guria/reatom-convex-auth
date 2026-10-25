@@ -20,6 +20,7 @@ This file is the local contract; kahraman is the upstream rationale.
 | Low-level test mechanics           | `src/shared/test/routeFetchAbortProbe.ts`, `abortErrorGuard.ts`, `setupStorybookUrl.ts` |
 | Per-entity MSW handlers            | `src/entities/<entity>/mocks/handlers.ts`                                               |
 | Global handler aggregate           | `src/app/mocks/handlers.ts`                                                             |
+| Fake Convex deployment             | `src/shared/mocks/convexBackend.ts`                                                     |
 | Mock error/timing helpers          | `src/shared/mocks/utils.ts` (`to500`, `neverResolve`, `withRetrySuccess`, `Error404`)   |
 | Viewport map                       | `.storybook/viewports.ts`                                                               |
 | Preview wiring                     | `.storybook/preview.tsx`                                                                |
@@ -53,7 +54,7 @@ export default meta
 export const HandlesLoadServerError = meta.story({
 	name: 'Connections Load Server Error',
 	play: () => I.waitExit(role('status')),
-	parameters: { msw: { handlers: { connectionList: connectionList.error } } },
+	beforeEach: ({ msw }) => msw.use(connectionList.error),
 })
 
 HandlesLoadServerError.test('shows error state when the request fails', async () => {
@@ -69,8 +70,13 @@ canvas, `userEvent`, and a fresh step trace. Register tests with
 Story-level parameters this project understands:
 
 - `initialPath` — path the router boots at (`setupStorybookUrl`).
-- `authenticated` — defaults to `true`; set `false` to boot signed out.
-- `msw.handlers` — override individual handler keys (see below).
+- `authenticated` — defaults to `true`, which boots with a restored Convex Auth
+  session for `alex@example.com`; set `false` to boot signed out.
+- `authProvider` — `'convex-auth'` or `'better-auth'`, the provider selected
+  on the sign-in page.
+
+MSW overrides are not parameters: CSF Next ignores `parameters.msw`, so a story
+calls `msw.use(...)` in its `beforeEach` (see below).
 
 ## Address the UI as a user would
 
@@ -156,18 +162,24 @@ export const connectionList = {
 }
 ```
 
-Defaults are registered globally (`preview.tsx` → `parameters.msw.handlers`).
-In a story, override **only the affected key** and keep the rest intact:
+Defaults are the worker's initial handlers (`setupMswWorker` in `preview.tsx`),
+which survive the addon's reset between stories. In a story, override **only
+the affected handler** in `beforeEach`:
 
 ```tsx
-parameters: {
-	msw: {
-		handlers: {
-			connectionList: connectionList.error
-		}
-	}
-}
+beforeEach: ({ msw }) => msw.use(connectionList.error),
 ```
+
+## Convex backend in stories
+
+Convex talks over a websocket that MSW cannot intercept, so each story gets an
+in-memory fake deployment (`src/shared/mocks/convexBackend.ts`). The decorator
+sets its transports into the app's injection atoms (`convex.transport`,
+`convexAuthTransport`, `betterAuthClient`). better-auth still runs its real
+client: its HTTP endpoints are MSW handlers (`fakeBetterAuthHandlers`) backed by
+the same fake. Assert on backend state that has no UI through
+`fakeConvexBackend.current`, e.g. `subscriptionCount('notes:list')` to prove a
+private query is not subscribed.
 
 Model distinct meaningful states (success / error / persistent-loading / retry).
 Don't add a state variant that doesn't exercise real behavior.
@@ -179,14 +191,14 @@ not to fill a matrix. Widths live in `.storybook/viewports.ts` (Panda default
 breakpoints `sm|md|lg|xl|2xl`; `FALLBACK_VIEWPORT` = 1280×720). Update that map
 if the Panda breakpoints change.
 
-A mobile story reuses its desktop counterpart's parameters and selects a
+A mobile story reuses its desktop counterpart's setup and selects a
 viewport global; prefix the test name with `[mobile]`:
 
 ```tsx
 export const HandlesLoadServerErrorMobile = meta.story({
 	name: 'Connections Load Server Error (Mobile)',
 	globals: { viewport: { value: 'sm', isRotated: false } },
-	parameters: HandlesLoadServerError.input.parameters,
+	beforeEach: HandlesLoadServerError.input.beforeEach,
 	play: () => I.waitExit(role('status')),
 })
 ```
@@ -199,11 +211,14 @@ so manual Storybook rendering is untouched.
 ## Preview wiring worth knowing (`preview.tsx`)
 
 - **Reatom frame** — a decorator provides `reatomContext.Provider`, boots the
-  router at `initialPath` via `setupStorybookUrl`, and sets `authSessionAtom`
-  from `authenticated`. `useMemo` keys a fresh frame on `[authenticated, initialPath]`.
+  router at `initialPath` via `setupStorybookUrl`, and wires a fresh fake Convex
+  backend into the frame. `useMemo` keys a fresh frame on
+  `[authenticated, initialPath, provider]`.
 - **Persisted-state reset** — under `__vitest_worker__` the decorator calls
   `window.localStorage.clear()` so `withLocalStorage` atoms (theme, locale,
-  top-bar toggles, auth) don't leak state between stories on the shared origin.
+  top-bar toggles) don't leak state between stories on the shared origin. Auth
+  storage keys are removed for every story, manual Storybook included, because
+  each story's fake backend starts empty.
 - **Abort guard** (`abortErrorGuard.ts`) — the `beforeEach` teardown drains
   Reatom `AbortError`s and **throws** if any leaked during a story; the decorator
   clears them on unmount. A story that leaks an abort will fail loudly.
@@ -238,7 +253,7 @@ runner configured.
   use `.within('global')`.
 - Async assertions wait on lifecycle (`waitExit` / `.wait()` / `retryTo`), never
   sleeps; persistent-loading stories assert loading UI.
-- MSW overrides touch a single handler key; defaults stay intact.
+- MSW overrides replace a single handler in `beforeEach`; defaults stay intact.
 - Shared actor helpers stay generic; domain steps and copy stay in the story.
 - Test names state the user-visible outcome; comments explain non-obvious
   synchronization or regressions.

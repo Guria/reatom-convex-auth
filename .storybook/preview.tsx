@@ -15,8 +15,21 @@ import { clearAbortErrors, drainAbortErrors, formatAbortErrors } from './abortEr
 import { useEffect, useMemo, type PropsWithChildren } from 'react'
 
 import { handlersArray } from '#app/mocks/handlers'
-import { authSessionAtom } from '#entities/auth'
-import { authMockSession } from '#entities/auth/mocks/data'
+import { authProvider } from '#entities/session'
+import {
+	betterAuthClient,
+	convex,
+	type AuthProviderId,
+	convexAuthStorageKeys,
+	convexAuthTransport,
+	createBetterAuthClient,
+} from '#shared/api'
+import {
+	createFakeConvexBackend,
+	FAKE_CONVEX_SITE_URL,
+	fakeBetterAuthHandlers,
+	fakeConvexBackend,
+} from '#shared/mocks/convexBackend'
 import { css } from '#styled-system/css'
 
 import { setupStorybookUrl } from './setupStorybookUrl'
@@ -36,7 +49,7 @@ const nativeHTMLElementFocus = globalThis.HTMLElement
 // — every story gets the full route set mocked by default, with individual
 // routes overridable via `msw.use(...)` in a story's `beforeEach`.
 async function setupMswWorker() {
-	const worker = setupWorker(...handlersArray)
+	const worker = setupWorker(...handlersArray, ...fakeBetterAuthHandlers)
 	await worker.start({
 		onUnhandledRequest: 'bypass',
 		quiet: true,
@@ -47,11 +60,41 @@ async function setupMswWorker() {
 	return worker
 }
 
+const SEEDED_USER = { email: 'alex@example.com', password: 'correct-horse' }
+const convexAuthKeys = convexAuthStorageKeys('convexAuth')
+// Auth state persisted by the adapters; each story gets a new fake backend.
+const AUTH_STORAGE_KEYS = [
+	convexAuthKeys.token,
+	convexAuthKeys.refreshToken,
+	'better-auth_cookie',
+	'better-auth_session_data',
+	'authProvider',
+]
+
+// A fresh in-memory Convex deployment per story. `authenticated` stories
+// start with a restored Convex Auth session, as after a page reload.
+const startFakeBackend = (authenticated: boolean) => {
+	AUTH_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key))
+	const backend = createFakeConvexBackend()
+	fakeConvexBackend.current = backend
+	if (authenticated) {
+		const tokens = backend.seedConvexAuthSession(SEEDED_USER.email, SEEDED_USER.password)
+		window.localStorage.setItem(convexAuthKeys.token, tokens.token)
+		window.localStorage.setItem(convexAuthKeys.refreshToken, tokens.refreshToken)
+	}
+	return backend
+}
+
 function ReatomDecorator({
 	children,
 	initialPath = '',
 	authenticated = true,
-}: PropsWithChildren<{ authenticated?: boolean; initialPath?: string }>) {
+	provider,
+}: PropsWithChildren<{
+	authenticated?: boolean
+	initialPath?: string
+	provider?: AuthProviderId
+}>) {
 	const frame = useMemo(() => {
 		// localStorage is shared across stories on the same origin. Atoms backed
 		// by withLocalStorage (theme, locale, top-bar toggles, auth) would otherwise
@@ -60,10 +103,14 @@ function ReatomDecorator({
 		if ((globalThis as Record<string, unknown>)['__vitest_worker__']) {
 			window.localStorage.clear()
 		}
+		const backend = startFakeBackend(authenticated)
 		return setupStorybookUrl(initialPath, () => {
-			authSessionAtom.set(authenticated ? authMockSession : null)
+			convex.transport.set(backend.transport)
+			convexAuthTransport.set(backend.convexAuth)
+			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
+			if (provider) authProvider.set(provider)
 		})
-	}, [authenticated, initialPath])
+	}, [authenticated, initialPath, provider])
 
 	useEffect(() => {
 		return () => {
@@ -82,6 +129,7 @@ const preview = definePreview({
 			<ReatomDecorator
 				authenticated={parameters['authenticated']}
 				initialPath={parameters['initialPath']}
+				provider={parameters['authProvider']}
 			>
 				<Story />
 			</ReatomDecorator>

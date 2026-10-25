@@ -1,0 +1,12 @@
+{
+	"nav_notes": "Notas",
+	"notes_title": "Notas",
+	"notes_viewer": "Sesión iniciada con {provider} como {email}",
+	"notes_new_label": "Nueva nota",
+	"notes_add": "Añadir nota",
+	"notes_adding": "Añadiendo nota",
+	"notes_empty": "Aún no hay notas. Añade la primera.",
+	"notes_loading": "Cargando notas",
+	"notes_error_title": "No se pudieron cargar las notas",
+	"notes_add_error": "No se pudo añadir la nota"
+}

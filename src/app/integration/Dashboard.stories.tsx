@@ -88,7 +88,7 @@ AbortsPendingDashboardRequestOnNavigation.test(
 		await expectRouteFetchAbortOnNavigation(
 			dashboardFetchAbortProbe,
 			async () => {
-				await I.click(button(/Alex Morgan/))
+				await I.click(button(/alex@example.com/))
 				await I.click(role('menuitem', /Sign out/).wait())
 			},
 			{ assertLoading: () => I.seeLoading() },

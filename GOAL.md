@@ -30,10 +30,16 @@ kahraman tests:
 
 ## Stage 2 — routing skeleton for auth
 
-- [ ] placeholder routes: sign-in (public) and a protected page
-- [ ] protected route redirects / shows sign-in when signed out (placeholder session atom)
-- [ ] kahraman browser proof: both routes navigable, gate visible
-- [ ] `mise run validate` green
+The template already ships this stage: `/login`, a `protectedRoute` layout
+around `/dashboard`, a mock session atom, and kahraman stories. Proof is the
+template's "Redirects Protected Routes" story in the green validate of f2656fd.
+Backend work (Stage 3, commit 1b0edba) started before this box was formally
+checked; no frontend code changed in between.
+
+- [x] placeholder routes: sign-in (public) and a protected page (template)
+- [x] protected route redirects to sign-in when signed out (template story)
+- [x] kahraman browser proof: both routes navigable, gate visible (template story)
+- [x] `mise run validate` green (f2656fd)
 
 ## Stage 3 — feature
 
@@ -46,14 +52,20 @@ kahraman tests:
       key (Convex Auth tokens have no `kid`), so both libraries sign with one
       shared RS256 key (`mise run convex:env`); better-auth lives at
       `/api/better-auth`; a `provider` claim tells the tokens apart.
-- [ ] Reatom↔Convex binding in `shared/api`: client, query subscription with connect-hook cleanup, mutation, two-phase auth state
-- [ ] Convex Auth adapter
-- [ ] better-auth adapter (vanilla client)
-- [ ] session entity + provider switch in the UI
-- [ ] auth UI (sign-in/sign-up form, sign-out) and private page
-- [ ] test strategy chosen and stated
-- [ ] kahraman stories: gate-closed + gate-open for Convex Auth
-- [ ] kahraman stories: gate-closed + gate-open for better-auth
-- [ ] steiger clean, `mise run validate` green
+- [x] Reatom↔Convex binding in `shared/api`: client, query subscription with connect-hook cleanup, mutation, two-phase auth state
+      (unit tests `src/shared/api/convex/reatomConvex.test.ts`: subscribe on
+      connect, re-subscribe on args change, unsubscribe on disconnect, errors
+      stored, server ack tracked)
+- [x] Convex Auth adapter (`shared/api/auth/convexAuth.ts`, own client for `auth:signIn`/`auth:signOut`)
+- [x] better-auth adapter (vanilla `better-auth/client` behind a plain facade)
+- [x] session entity (`entities/session`) + provider switch (radio group on the sign-in page)
+- [x] auth UI (sign-in/sign-up form, account-menu sign-out) and private notes page
+- [x] test strategy: an injected in-memory fake Convex deployment for stories
+      (hermetic, part of validate; better-auth's real client runs against MSW),
+      convex-test for backend functions, and `mise run convex:smoke` against the
+      real local backend for what fakes cannot prove
+- [x] kahraman stories: gate-closed + gate-open for Convex Auth (`src/app/integration/Auth.stories.tsx`)
+- [x] kahraman stories: gate-closed + gate-open for better-auth (same file)
+- [x] steiger clean, `mise run validate` green (exit 0, 54 tests)
 - [ ] README run + provider-switch section
 - [ ] manual check against the real local Convex backend

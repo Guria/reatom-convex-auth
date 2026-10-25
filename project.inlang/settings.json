@@ -10,7 +10,8 @@
 		"pathPattern": [
 			"./messages/{locale}/core.json",
 			"./messages/{locale}/auth.json",
-			"./messages/{locale}/dashboard.json"
+			"./messages/{locale}/dashboard.json",
+			"./messages/{locale}/notes.json"
 		]
 	}
 }

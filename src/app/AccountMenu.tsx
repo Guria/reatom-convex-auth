@@ -1,22 +1,16 @@
-import { action, wrap } from '@reatom/core'
+import { wrap } from '@reatom/core'
 import { reatomComponent } from '@reatom/react'
 import { ChevronsUpDown, LogOut } from 'lucide-react'
 
-import { authSessionAtom, logoutAction } from '#entities/auth'
+import { authProvider, authProviderLabel, sessionUser, signOut } from '#entities/session'
 import { m } from '#paraglide/messages.js'
 import { Menu, Text } from '#shared/components'
 import { css } from '#styled-system/css'
 import { styled } from '#styled-system/jsx'
 
-// App-layer sign-out orchestration. `logoutAction` clears the session before
-// its (possibly failing) API call, so swallow that rejection to keep sign-out
-// resilient to a logout API failure.
-const signOut = action(async () => {
-	await wrap(logoutAction()).catch(() => {})
-}, 'app.signOut')
-
 export const AccountMenu = reatomComponent(() => {
-	const session = authSessionAtom()
+	const user = sessionUser()
+	const provider = authProviderLabel(authProvider())
 
 	return (
 		<Menu.Root positioning={{ placement: 'bottom-start' }}>
@@ -51,7 +45,7 @@ export const AccountMenu = reatomComponent(() => {
 						fontWeight="bold"
 						color="colorPalette.11"
 					>
-						{session?.user.name.charAt(0) ?? ''}
+						{user?.email.charAt(0).toUpperCase() ?? ''}
 					</styled.div>
 					<styled.div
 						flex="1"
@@ -60,10 +54,10 @@ export const AccountMenu = reatomComponent(() => {
 						className={css({ '[data-sidebar-collapsed] &': { display: 'none' } })}
 					>
 						<styled.div fontSize="sm" fontWeight="medium" truncate>
-							{session?.user.name ?? ''}
+							{user?.email ?? ''}
 						</styled.div>
 						<styled.div fontSize="xs" color="muted" truncate>
-							{session?.user.email ?? ''}
+							{provider}
 						</styled.div>
 					</styled.div>
 					<ChevronsUpDown
@@ -79,13 +73,13 @@ export const AccountMenu = reatomComponent(() => {
 			</Menu.Trigger>
 			<Menu.Positioner>
 				<Menu.Content minW="56">
-					{session && (
+					{user && (
 						<styled.div px="3" py="2" mb="1">
 							<Text fontSize="sm" fontWeight="medium">
-								{session.user.name}
+								{user.email}
 							</Text>
 							<Text fontSize="xs" color="muted">
-								{session.user.email}
+								{provider}
 							</Text>
 						</styled.div>
 					)}

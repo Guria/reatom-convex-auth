@@ -1,35 +1,43 @@
-import { urlAtom, reatomForm } from '@reatom/core'
+import { reatomEnum, reatomForm, urlAtom, wrap } from '@reatom/core'
 import { Fragment } from 'react'
 
-import { isAuthenticatedAtom, loginAction } from '#entities/auth'
+import { sessionStatus, signIn, signUp } from '#entities/session'
 import { createAppPath, rootRoute } from '#shared/router'
 
 import { LoginPage } from '../ui/LoginPage'
 
-const dashboardPath = createAppPath('dashboard')
+const notesPath = createAppPath('notes')
 
-const reatomLoginForm = () =>
-	reatomForm(
-		{ email: 'alex@example.com', password: 'password' },
-		{ name: 'loginForm', onSubmit: loginAction },
+const reatomAuthForm = () => {
+	const mode = reatomEnum(['signIn', 'signUp'], 'authForm.mode')
+	const form = reatomForm(
+		{ email: '', password: '' },
+		{
+			name: 'authForm',
+			onSubmit: async (credentials) => {
+				await wrap(mode() === 'signUp' ? signUp(credentials) : signIn(credentials))
+			},
+		},
 	)
+	return { mode, form }
+}
 
-export type LoginForm = ReturnType<typeof reatomLoginForm>
+export type AuthFormModel = ReturnType<typeof reatomAuthForm>
 
 export const loginRoute = rootRoute.reatomRoute(
 	{
 		path: 'login',
 		params: () => {
-			if (!isAuthenticatedAtom()) return {}
-			urlAtom.go(dashboardPath, true)
+			if (sessionStatus() !== 'authenticated') return {}
+			urlAtom.go(notesPath, true)
 			return null
 		},
 		async loader() {
-			return { loginForm: reatomLoginForm() }
+			return reatomAuthForm()
 		},
 		render(self) {
 			const { isFulfilled, data } = self.loader.status()
-			return isFulfilled ? <LoginPage form={data.loginForm} /> : <Fragment key="loading" />
+			return isFulfilled ? <LoginPage key="login" model={data} /> : <Fragment key="loading" />
 		},
 	},
 	'login',
