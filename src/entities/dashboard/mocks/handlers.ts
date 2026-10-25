@@ -16,7 +16,7 @@ const dashboardStatsResolver = (async () => {
 export const dashboardStats = {
 	default: http.get(url, dashboardStatsResolver),
 	error: http.get(url, () => to500()),
-	retrySucceeds: () => http.get(url, withRetrySuccess(dashboardStatsResolver)),
+	retrySucceeds: () => http.get(url, withRetrySuccess(dashboardStatsResolver, 1)),
 	loading: http.get(url, neverResolve),
 }
 

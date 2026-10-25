@@ -17,42 +17,19 @@ ignoreDependencies = [
 # The skeleton keeps these shared extension points even when its starter screens do not
 # consume them yet.
 ignoreExports = [
-	{ file = "src/shared/api/index.ts", exports = [
-		"isApiError",
-	] },
-	{ file = "src/shared/components/CollectionSelect.tsx", exports = [
-		"CollectionSelect",
-	] },
-	{ file = "src/shared/components/index.ts", exports = [
-		"CollectionSelect",
-	] },
-	{ file = "src/shared/model/index.ts", exports = [
-		"reatomLoc",
-		"withMatchMobileHeaderOverride",
-	] },
-	{ file = "src/shared/model/locale.ts", exports = [
-		"reatomLoc",
-	] },
-	{ file = "src/shared/router.ts", exports = [
-		"createSearchParamsPath",
-	] },
-	{ file = "src/shared/test/index.ts", exports = [
-		"link",
-		"withDetailError",
-	] },
-	{ file = "src/shared/test/pageActor.ts", exports = [
-		"withDetailError",
-	] },
-	{ file = "src/widgets/data-page/index.ts", exports = [
-		"ListToolbar",
-		"NoSelectionState",
-	] },
-	{ file = "src/widgets/data-page/ui/ListToolbar.tsx", exports = [
-		"ListToolbar",
-	] },
-	{ file = "src/widgets/data-page/ui/NoSelectionState.tsx", exports = [
-		"NoSelectionState",
-	] },
+	# PostCSS loads this CommonJS config by convention.
+	{ file = "postcss.config.cjs", exports = ["plugins"] },
+	{ file = "src/shared/api/index.ts", exports = ["isApiError"] },
+	{ file = "src/shared/components/CollectionSelect.tsx", exports = ["CollectionSelect"] },
+	{ file = "src/shared/components/index.ts", exports = ["CollectionSelect"] },
+	{ file = "src/shared/model/index.ts", exports = ["reatomLoc", "withMatchMobileHeaderOverride"] },
+	{ file = "src/shared/model/locale.ts", exports = ["reatomLoc"] },
+	{ file = "src/shared/router.ts", exports = ["createSearchParamsPath"] },
+	{ file = "src/shared/test/index.ts", exports = ["link", "withDetailError"] },
+	{ file = "src/shared/test/pageActor.ts", exports = ["withDetailError"] },
+	{ file = "src/widgets/data-page/index.ts", exports = ["ListToolbar", "NoSelectionState"] },
+	{ file = "src/widgets/data-page/ui/ListToolbar.tsx", exports = ["ListToolbar"] },
+	{ file = "src/widgets/data-page/ui/NoSelectionState.tsx", exports = ["NoSelectionState"] },
 ]
 
 # Park UI and generated assets are committed vendor/generated code.

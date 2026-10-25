@@ -76,11 +76,9 @@ export const DefaultMobile = meta.story({
 
 export const AbortsPendingDashboardRequestOnNavigation = meta.story({
 	name: 'Aborts Pending Dashboard Request On Navigation',
-	beforeEach: routeFetchAbortLifecycle(dashboardFetchAbortProbe),
-	parameters: {
-		msw: {
-			handlers: { dashboardStats: dashboardStats.loading },
-		},
+	beforeEach: ({ msw }) => {
+		msw.use(dashboardStats.loading)
+		return routeFetchAbortLifecycle(dashboardFetchAbortProbe)()
 	},
 })
 
@@ -109,11 +107,7 @@ DefaultMobile.test('[mobile] renders stat cards', async () => {
 export const HandlesDashboardLoadServerError = meta.story({
 	name: 'Dashboard Load Server Error',
 	play: () => I.waitExit(role('status')),
-	parameters: {
-		msw: {
-			handlers: { dashboardStats: dashboardStats.error },
-		},
-	},
+	beforeEach: ({ msw }) => msw.use(dashboardStats.error),
 })
 
 HandlesDashboardLoadServerError.test('shows error state when dashboard request fails', async () => {
@@ -131,11 +125,7 @@ HandlesDashboardLoadServerError.test('keeps error state when retry also fails', 
 export const RecoversAfterDashboardLoadRetry = meta.story({
 	name: 'Dashboard Load Retry Success',
 	play: () => I.waitExit(role('status')),
-	parameters: {
-		msw: {
-			handlers: { dashboardStats: dashboardStats.retrySucceeds() },
-		},
-	},
+	beforeEach: ({ msw }) => msw.use(dashboardStats.retrySucceeds()),
 })
 
 RecoversAfterDashboardLoadRetry.test('loads dashboard data after retry succeeds', async () => {
@@ -149,7 +139,7 @@ RecoversAfterDashboardLoadRetry.test('loads dashboard data after retry succeeds'
 export const HandlesDashboardLoadServerErrorMobile = meta.story({
 	name: 'Dashboard Load Server Error (Mobile)',
 	globals: { viewport: { value: 'sm', isRotated: false } },
-	parameters: HandlesDashboardLoadServerError.input.parameters,
+	beforeEach: HandlesDashboardLoadServerError.input.beforeEach,
 	play: () => I.waitExit(role('status')),
 })
 
@@ -163,11 +153,7 @@ HandlesDashboardLoadServerErrorMobile.test(
 
 export const KeepsLoadingWhenDashboardRequestNeverResolves = meta.story({
 	name: 'Dashboard Request Loading State',
-	parameters: {
-		msw: {
-			handlers: { dashboardStats: dashboardStats.loading },
-		},
-	},
+	beforeEach: ({ msw }) => msw.use(dashboardStats.loading),
 })
 
 KeepsLoadingWhenDashboardRequestNeverResolves.test(
@@ -180,7 +166,7 @@ KeepsLoadingWhenDashboardRequestNeverResolves.test(
 export const KeepsLoadingWhenDashboardRequestNeverResolvesMobile = meta.story({
 	name: 'Dashboard Request Loading State (Mobile)',
 	globals: { viewport: { value: 'sm', isRotated: false } },
-	parameters: KeepsLoadingWhenDashboardRequestNeverResolves.input.parameters,
+	beforeEach: KeepsLoadingWhenDashboardRequestNeverResolves.input.beforeEach,
 })
 
 KeepsLoadingWhenDashboardRequestNeverResolvesMobile.test(

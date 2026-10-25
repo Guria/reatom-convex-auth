@@ -54,11 +54,7 @@ RedirectsProtectedRoutes.test(
 
 export const HandlesLoginError = meta.story({
 	name: 'Login Error',
-	parameters: {
-		msw: {
-			handlers: { authLogin: authHandlers.loginError },
-		},
-	},
+	beforeEach: ({ msw }) => msw.use(authHandlers.loginError),
 })
 
 HandlesLoginError.test('shows an error when server fails', async () => {
@@ -96,12 +92,10 @@ SignOut.test('signs out and returns to login', async () => {
 
 export const SignOutWhenApiFails = meta.story({
 	name: 'Sign Out When API Fails',
+	beforeEach: ({ msw }) => msw.use(authHandlers.logoutError),
 	parameters: {
 		authenticated: true,
 		initialPath: 'dashboard',
-		msw: {
-			handlers: { authLogout: authHandlers.logoutError },
-		},
 	},
 	play: () => I.waitExit(role('status')),
 })
