@@ -30,9 +30,17 @@ export default defineConfig({
 			],
 		},
 		sortPackageJson: { sortScripts: true },
-		ignorePatterns: ['public/mockServiceWorker.js'],
+		ignorePatterns: [
+			'public/mockServiceWorker.js',
+			'convex/_generated/**',
+			// Installed by `npx convex ai-files install`.
+			'.agents/**',
+			'.claude/**',
+			'skills-lock.json',
+		],
 	},
 	lint: {
+		ignorePatterns: ['convex/_generated/**', '.agents/**', '.claude/**'],
 		plugins: ['import', 'react'],
 		categories: {
 			correctness: 'error',

@@ -147,6 +147,26 @@ arg "[rest]" help="Additional arguments to pass to Vite"
 '''
 run = "nub exec vp dev --port ${usage_port?} ${usage_rest}"
 
+[tasks."convex:dev"]
+description = "Run the Convex backend and push functions on change (local deployment, no login)"
+run = '''
+# Anonymous mode creates a local deployment on first run; later runs reuse the
+# one recorded in .env.local, including a logged-in user's.
+if grep -q '^CONVEX_DEPLOYMENT=' .env.local 2>/dev/null; then
+  nub exec convex dev
+else
+  CONVEX_AGENT_MODE=anonymous nub exec convex dev
+fi
+'''
+
+[tasks."convex:env"]
+description = "Generate and set the deployment variables both auth providers need"
+run = "nub scripts/convex-env.ts"
+
+[tasks."convex:smoke"]
+description = "Sign up with both auth providers against the running Convex backend"
+run = "nub scripts/convex-smoke.ts"
+
 [tasks.storybook]
 description = "Start Storybook dev server"
 depends = ["prepare:codegen"]
@@ -200,7 +220,7 @@ run = "nub exec vp lint --fix"
 [tasks.typecheck]
 description = "Type check with TypeScript 7"
 alias = "tc"
-run = "nub exec tsc -b"
+run = ["nub exec tsc -b", "nub exec tsc -p convex --noEmit"]
 
 [tasks.check]
 description = "Run hk quality checks"

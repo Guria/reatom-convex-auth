@@ -5,6 +5,8 @@ entry = ["scripts/**/*.ts"]
 # `storybook`: imported by the kahraman actor harness but never runs in production.
 # `@ark-ui/react`: consumed by the excluded generated Park UI component sources.
 # Steiger and its FSD plugin are loaded by the excluded tooling config and mise task.
+# `zod`: pins zod 4 at the root of the hoisted tree; better-auth imports it
+# without declaring a nested copy, and steiger's zod 3 would win otherwise.
 ignoreDependencies = [
 	"@ark-ui/react",
 	"@feature-sliced/steiger-plugin",
@@ -12,6 +14,7 @@ ignoreDependencies = [
 	"idb-keyval",
 	"steiger",
 	"storybook",
+	"zod",
 ]
 
 # The skeleton keeps these shared extension points even when its starter screens do not

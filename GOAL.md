@@ -21,10 +21,12 @@ kahraman tests:
 
 ## Stage 1 — scaffold + validation baseline
 
-- [ ] karkas scaffolded with `npm create karkas@latest . --no-git`
-- [ ] `git init -b main`, untouched template committed
-- [ ] `mise trust` + `nub install` succeed
-- [ ] `mise run validate` green on the untouched template
+- [x] karkas scaffolded with `npm create karkas@latest . --no-git` (commit 89aae19)
+- [x] `git init -b main`, untouched template committed (89aae19)
+- [x] `mise trust` + `nub install` succeed
+- [x] `mise run validate` green on the template after the drift repair in f2656fd
+      (published 0.1.0 does not validate as-is: msw-storybook-addon 2 vs 3 API,
+      coverage-v8/vitest mismatch, CSF3-only `parameters.msw`). Exit 0, 46 tests.
 
 ## Stage 2 — routing skeleton for auth
 
@@ -35,9 +37,15 @@ kahraman tests:
 
 ## Stage 3 — feature
 
-- [ ] Convex installed, local anonymous deployment runs without login
-- [ ] Convex schema + private query (`messages` or similar owned by the user)
-- [ ] Both auth components coexist on one deployment (or env-var fallback, with reason)
+- [x] Convex installed, local anonymous deployment runs without login
+      (`CONVEX_AGENT_MODE=anonymous convex dev`, wrapped as `mise run convex:dev`)
+- [x] Convex schema + private query: `notes.list` / `notes.add`, owner derived server-side
+- [x] Both auth components coexist on one deployment. Proof: `mise run convex:smoke`
+      (both providers sign up, get accepted, see only their own notes).
+      Findings: one OIDC provider can serve both only if the JWKS has a single
+      key (Convex Auth tokens have no `kid`), so both libraries sign with one
+      shared RS256 key (`mise run convex:env`); better-auth lives at
+      `/api/better-auth`; a `provider` claim tells the tokens apart.
 - [ ] Reatom↔Convex binding in `shared/api`: client, query subscription with connect-hook cleanup, mutation, two-phase auth state
 - [ ] Convex Auth adapter
 - [ ] better-auth adapter (vanilla client)
