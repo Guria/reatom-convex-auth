@@ -1,5 +1,6 @@
 import type {
 	AuthTokenFetcher,
+	BaseConvexClient,
 	ConnectionState,
 	ConvexClient,
 	OptimisticUpdate,
@@ -25,7 +26,7 @@ import {
 	wrap,
 	type Atom,
 } from '@reatom/core'
-import { makeFunctionReference } from 'convex/server'
+import { getFunctionName, makeFunctionReference } from 'convex/server'
 import { convexToJson, jsonToConvex, type Value } from 'convex/values'
 
 type QueryState<T> =
@@ -56,6 +57,59 @@ type Subscribe<Args, T> = (
 	onError: (error: Error) => void,
 ) => Unsubscribe<T>
 
+type Listeners = Map<string, Set<() => void>>
+const listenersByClient = new WeakMap<BaseConvexClient, Listeners>()
+
+// One transition handler per client dispatching by query token, as
+// ConvexReactClient does. `ConvexClient.onUpdate` checks every listener on
+// every transition instead: quadratic in the number of subscriptions.
+const listenersOf = (base: BaseConvexClient) => {
+	let listeners = listenersByClient.get(base)
+	if (!listeners) {
+		const created: Listeners = new Map()
+		base.addOnTransitionHandler(({ queries }) => {
+			for (const { token } of queries) created.get(token)?.forEach((listener) => listener())
+		})
+		listenersByClient.set(base, created)
+		listeners = created
+	}
+	return listeners
+}
+
+const watchQuery = <Query extends FunctionReference<'query'>>(
+	client: ConvexClient,
+	ref: Query,
+	args: FunctionArgs<Query>,
+	onResult: (result: FunctionReturnType<Query>) => void,
+	onError: (error: Error) => void,
+): Unsubscribe<FunctionReturnType<Query>> => {
+	const base = client.client
+	const name = getFunctionName(ref)
+	const { queryToken, unsubscribe } = base.subscribe(name, args)
+	const getCurrentValue = () =>
+		base.localQueryResult(name, args) as FunctionReturnType<Query> | undefined
+	const listener = () => {
+		let result: FunctionReturnType<Query> | undefined
+		try {
+			result = getCurrentValue()
+		} catch (error) {
+			return onError(error as Error)
+		}
+		// A removed result reads as undefined.
+		if (result !== undefined) onResult(result)
+	}
+	const listeners = listenersOf(base)
+	const tokenListeners = listeners.get(queryToken) ?? new Set()
+	listeners.set(queryToken, tokenListeners.add(listener))
+	const stop = () => {
+		if (!tokenListeners.delete(listener)) return
+		if (tokenListeners.size === 0 && listeners.get(queryToken) === tokenListeners)
+			listeners.delete(queryToken)
+		unsubscribe()
+	}
+	return Object.assign(stop, { getCurrentValue })
+}
+
 // Convex's own args identity: `useQuery` compares the same serialization.
 const argsKey = (args: object) => JSON.stringify(convexToJson(args as Value))
 
@@ -75,13 +129,17 @@ const withSubscription = <Args extends object, T>(
 		error: (error: Error) => void
 	},
 	name: string,
-) =>
-	withConnectHook(() => {
+) => {
+	// A computed rather than an effect: subscribing is synchronous and needs no
+	// abort scope, which costs an AbortController per subscription.
+	const source = computed(() => {
+		const nextArgs = args()
+		const key = nextArgs === 'skip' ? 'skip' : argsKey(nextArgs)
+		return { client: client(), args: nextArgs, key }
+	}, `${name}.source`)
+	return withConnectHook(() => {
 		let current: { client: ConvexClient; key: string; unsubscribe: () => void } | null = null
-		const subscription = effect(() => {
-			const nextClient = client()
-			const nextArgs = args()
-			const key = nextArgs === 'skip' ? 'skip' : argsKey(nextArgs)
+		const unsubscribeSource = source.subscribe(({ client: nextClient, args: nextArgs, key }) => {
 			if (current?.client === nextClient && current.key === key) return
 			current?.unsubscribe()
 			if (nextArgs === 'skip') {
@@ -105,14 +163,15 @@ const withSubscription = <Args extends object, T>(
 			}
 			if (cached === undefined) handlers.pending()
 			else handlers.result(cached)
-		}, `${name}.subscription`)
+		})
 		// Convex subscriptions live outside Reatom's graph: drop them on disconnect.
 		return () => {
-			subscription.unsubscribe()
+			unsubscribeSource()
 			current?.unsubscribe()
 			current = null
 		}
 	})
+}
 
 /**
  * Reatom binding for a Convex deployment. `client` is read lazily, so a test
@@ -187,7 +246,7 @@ export const reatomConvex = (createClient: () => ConvexClient, name: string) => 
 				client,
 				args,
 				(current, nextArgs, onResult, onError) =>
-					current.onUpdate(ref, nextArgs, onResult, onError) as Unsubscribe<Data>,
+					watchQuery(current, ref, nextArgs, onResult, onError),
 				{
 					skipped: () => state.set({ status: 'skipped' }),
 					pending: () => {
