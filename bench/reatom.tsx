@@ -1,12 +1,8 @@
-import { context } from '@reatom/core'
 import { reatomComponent, reatomContext } from '@reatom/react'
-import { ConvexClient } from 'convex/browser'
 
-import { reatomConvex } from '../src/shared/api/convex/reatomConvex'
-import { addNoteFirst, api, CLIENT_URL, counters, type Binding } from './fixture'
-
-type Convex = ReturnType<typeof reatomConvex>
-type ItemModel = ReturnType<Convex['query']>
+import { counters, type Binding, type Note } from './fixture'
+import { reactView } from './reactView'
+import { reatomModels, type ItemModel } from './reatomModels'
 
 const Item = reatomComponent(({ id, model }: { id: number; model: ItemModel }) => {
 	counters.renders++
@@ -15,7 +11,7 @@ const Item = reatomComponent(({ id, model }: { id: number; model: ItemModel }) =
 }, 'Item')
 
 const Notes = reatomComponent(
-	({ notes }: { notes: () => Array<{ _id: string; text: string }> }) => (
+	({ notes }: { notes: () => Note[] }) => (
 		<ul>
 			{notes().map((note) => (
 				<li key={note._id}>{note.text}</li>
@@ -26,40 +22,30 @@ const Notes = reatomComponent(
 )
 
 export const reatom: Binding = {
-	label: 'reatom',
-	create({ server }) {
-		const client = new ConvexClient(CLIENT_URL, {
-			webSocketConstructor: server.WebSocket,
-			skipConvexDeploymentUrlCheck: true,
-			unsavedChangesWarning: false,
-		})
-		const frame = context.start()
-		const convex = reatomConvex(() => client, 'bench')
-		const provide = (node: React.ReactNode) => (
-			<reatomContext.Provider value={frame}>{node}</reatomContext.Provider>
-		)
-		const itemQuery = (id: number) => convex.query(api.item, () => ({ id }), `item${id}`)
+	label: '@reatom/react',
+	commits: true,
+	create(server, container) {
+		const models = reatomModels(server)
+		const view = reactView(container)
+		const provide = (node: React.ReactNode) =>
+			view.show(<reatomContext.Provider value={models.frame}>{node}</reatomContext.Provider>)
 		return {
-			connected: () => client.connectionState().isWebSocketConnected,
-			items: (ids) => provide(ids.map((id) => <Item key={id} id={id} model={itemQuery(id)} />)),
+			connected: models.connected,
+			items: (ids) => provide(ids.map((id) => <Item key={id} id={id} model={models.item(id)} />)),
 			shared: (count) => {
-				const model = itemQuery(0)
-				return provide(
+				const model = models.item(0)
+				provide(
 					Array.from({ length: count }, (_, index) => <Item key={index} id={0} model={model} />),
 				)
 			},
-			list: (handle) => {
-				const notes = convex.query(api.list, () => ({}), 'list')
-				const add = convex.mutation(api.add, 'add', { optimisticUpdate: addNoteFirst })
-				handle.add = (text) => frame.run(() => add({ text }))
-				return provide(<Notes notes={() => notes.data() ?? []} />)
+			list: (handle) => provide(<Notes notes={models.list(handle)} />),
+			pages: (initialNumItems, handle) =>
+				provide(<Notes notes={models.pages(initialNumItems, handle)} />),
+			clear: view.clear,
+			close: () => {
+				view.dispose()
+				return models.client.close()
 			},
-			pages: (initialNumItems, handle) => {
-				const pages = convex.paginatedQuery(api.page, () => ({}), { initialNumItems }, 'pages')
-				handle.loadMore = (numItems) => frame.run(() => pages.loadMore(numItems))
-				return provide(<Notes notes={pages.results} />)
-			},
-			close: () => client.close(),
 		}
 	},
 }

@@ -1,9 +1,7 @@
 // Runtime benchmark: the same scenarios for each binding, each iteration on a
-// fresh fake server, client and React root. `scripts/bench.ts` builds this page
+// fresh fake server, client and container. `scripts/bench.ts` builds this page
 // in production mode and calls `runBenchmarks` from Playwright.
 import { clearStack } from '@reatom/core'
-import { Profiler } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 
 import {
 	counters,
@@ -17,6 +15,7 @@ import {
 } from './fixture'
 import { official } from './official'
 import { reatom } from './reatom'
+import { reatomJsx } from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
@@ -31,35 +30,27 @@ type Config = {
 type Sample = { ms: number; renders: number; commits: number }
 type Results = Record<string, Record<string, Sample[]>>
 
-const allBindings = [official, reatom]
+const allBindings = [official, reatom, reatomJsx]
 
 const settle = (server: BenchServer) => server.server.settled()
 
 async function session<T>(binding: Binding, run: (ctx: Context) => Promise<T>) {
 	const server = createBenchServer()
-	const instance = binding.create(server)
+	// @reatom/jsx observes the container's parent, so it is attached first.
 	const container = document.createElement('div')
 	document.body.append(container)
-	const root = createRoot(container)
+	const instance = binding.create(server, container)
 	while (!instance.connected()) await settle(server)
 	try {
-		return await run({ server, instance, container, root })
+		return await run({ server, instance, container })
 	} finally {
-		root.unmount()
-		container.remove()
 		await instance.close()
+		container.remove()
 		server.server.close()
 	}
 }
 
-type Context = { server: BenchServer; instance: BenchInstance; container: HTMLElement; root: Root }
-
-const render = (root: Root, node: React.ReactNode) =>
-	root.render(
-		<Profiler id="bench" onRender={() => counters.commits++}>
-			{node}
-		</Profiler>,
-	)
+type Context = { server: BenchServer; instance: BenchInstance; container: HTMLElement }
 
 /** Times `act` until `done`, counting renders and commits. */
 async function measure(container: Element, act: () => void, done: () => boolean): Promise<Sample> {
@@ -77,10 +68,10 @@ type Scenario = (binding: Binding, config: Config) => Promise<Record<string, Sam
 
 // N components, each with its own query.
 const distinctQueries: Scenario = (binding, { items }) =>
-	session(binding, async ({ server, instance, container, root }) => {
+	session(binding, async ({ server, instance, container }) => {
 		const ids = Array.from({ length: items }, (_, index) => index)
 		const all = (v: number) => () => count(container, `[data-v="${v}"]`) === items
-		const mount = await measure(container, () => render(root, instance.items(ids)), all(0))
+		const mount = await measure(container, () => instance.items(ids), all(0))
 		const updateAll = await measure(container, () => server.bump(ids), all(1))
 		const middle = Math.floor(items / 2)
 		const updateOne = await measure(
@@ -92,7 +83,7 @@ const distinctQueries: Scenario = (binding, { items }) =>
 		await settle(server)
 		updateOne.renders = counters.renders
 		const start = performance.now()
-		root.render(null)
+		instance.clear()
 		while (server.server.subscriptionCount('bench:item') > 0) await settle(server)
 		const unmount = { ms: performance.now() - start, renders: 0, commits: 0 }
 		return { mount, 'update all': updateAll, 'update one': updateOne, unmount }
@@ -100,17 +91,17 @@ const distinctQueries: Scenario = (binding, { items }) =>
 
 // N components reading one query.
 const sharedQuery: Scenario = (binding, { items }) =>
-	session(binding, async ({ server, instance, container, root }) => {
+	session(binding, async ({ server, instance, container }) => {
 		const all = (v: number) => () => count(container, `[data-v="${v}"]`) === items
-		const mount = await measure(container, () => render(root, instance.shared(items)), all(0))
+		const mount = await measure(container, () => instance.shared(items), all(0))
 		const update = await measure(container, () => server.bump([0]), all(1))
 		return { 'shared mount': mount, 'shared update': update }
 	})
 
 const optimisticMutation: Scenario = (binding) =>
-	session(binding, async ({ instance, container, root }) => {
+	session(binding, async ({ instance, container }) => {
 		const handle: Handle = {}
-		render(root, instance.list(handle))
+		instance.list(handle)
 		await until(container, () => count(container, 'li') === LIST_SIZE)
 		const first = () => container.querySelector('li')?.textContent
 		counters.renders = 0
@@ -130,12 +121,12 @@ const optimisticMutation: Scenario = (binding) =>
 	})
 
 const pagination: Scenario = (binding) =>
-	session(binding, async ({ instance, container, root }) => {
+	session(binding, async ({ instance, container }) => {
 		const handle: Handle = {}
 		const pageSize = 25
 		const first = await measure(
 			container,
-			() => render(root, instance.pages(pageSize, handle)),
+			() => instance.pages(pageSize, handle),
 			() => count(container, 'li') === pageSize,
 		)
 		const more = await measure(
@@ -151,20 +142,25 @@ const allScenarios = { distinctQueries, sharedQuery, optimisticMutation, paginat
 const selected = <T,>(entries: Array<[string, T]>, names: string[] | undefined) =>
 	entries.filter(([name]) => !names || names.includes(name)).map(([, value]) => value)
 
-const record = (results: Results, label: string, samples: Record<string, Sample>) => {
+// Without React there are no commits to count.
+const withCommits = (binding: Binding, sample: Sample): Sample =>
+	binding.commits ? sample : { ...sample, commits: Number.NaN }
+
+const record = (results: Results, binding: Binding, samples: Record<string, Sample>) => {
 	for (const [name, sample] of Object.entries(samples)) {
-		;((results[name] ??= {})[label] ??= []).push(sample)
+		;((results[name] ??= {})[binding.label] ??= []).push(withCommits(binding, sample))
 	}
 }
 
-// Alternates which binding goes first.
-const orderFor = (iteration: number, bindings: Binding[]) =>
-	iteration % 2 === 0 ? bindings : bindings.toReversed()
+// Rotates which binding goes first.
+const orderFor = (iteration: number, bindings: Binding[]) => {
+	const shift = iteration % bindings.length
+	return [...bindings.slice(shift), ...bindings.slice(0, shift)]
+}
 
 async function runRound(config: Config, sink: Results, order: Binding[], scenarios: Scenario[]) {
 	const runs = scenarios.flatMap((scenario) => order.map((binding) => [scenario, binding] as const))
-	for (const [scenario, binding] of runs)
-		record(sink, binding.label, await scenario(binding, config))
+	for (const [scenario, binding] of runs) record(sink, binding, await scenario(binding, config))
 }
 
 async function runBenchmarks(config: Config): Promise<Results> {

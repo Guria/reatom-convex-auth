@@ -121,10 +121,12 @@ mounted. Gating is done by routes reading `sessionStatus` instead of
 `<Authenticated>`. The pagination helpers from `convex/react` work with the
 binding's optimistic updates: the notes page adds notes through `insertAtTop`.
 
-`mise run bench` measures both. Single queries, mutations and pagination come
-out within 0.1 ms of each other. With 1000 subscriptions at once, mounting
-takes 1.3× as long and unmounting 2.3×, mostly from aborting Reatom scopes.
-See [bench/README.md](bench/README.md).
+`mise run bench` measures convex/react against the binding rendered by
+@reatom/react and by @reatom/jsx. Single queries, mutations and pagination
+come out within a few tenths of a millisecond. With 1000 subscriptions at
+once, @reatom/react takes 1.4× as long to mount and 2.3× to unmount;
+@reatom/jsx takes 1.2× for both and updates shared queries 4× faster. See
+[bench/README.md](bench/README.md).
 
 ## Validation
 

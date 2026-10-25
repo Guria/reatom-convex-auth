@@ -2,6 +2,7 @@ import { createFakeConvexServer, paginate } from '../src/shared/mocks/fakeConvex
 import { DATASET_SIZE, LIST_SIZE, type Note } from './api'
 
 export { addNoteFirst, api, LIST_SIZE } from './api'
+export type { Note } from './api'
 
 export function createBenchServer() {
 	const values = new Map<number, number>()
@@ -61,19 +62,32 @@ export const until = (root: Element, done: () => boolean, timeout = 20_000) =>
 		})
 	})
 
-/** Renders and commits counted across a scenario. */
+/**
+ * Item component renders (for @reatom/jsx, recomputes of an item's bound
+ * value) and React commits counted across a scenario.
+ */
 export const counters = { renders: 0, commits: 0 }
 
 export type Handle = { add?: (text: string) => Promise<unknown>; loadMore?: (n: number) => void }
 
-/** One binding under test, bound to one server and client. */
+/**
+ * One binding under test, bound to one server, client and container. Each
+ * view method builds its models and renders them into the container.
+ */
 export type BenchInstance = {
 	connected(): boolean
-	items(ids: number[]): React.ReactNode
-	shared(count: number): React.ReactNode
-	list(handle: Handle): React.ReactNode
-	pages(initialNumItems: number, handle: Handle): React.ReactNode
+	items(ids: number[]): void
+	shared(count: number): void
+	list(handle: Handle): void
+	pages(initialNumItems: number, handle: Handle): void
+	/** Removes the rendered view. */
+	clear(): void
 	close(): Promise<void>
 }
 
-export type Binding = { label: string; create(server: BenchServer): BenchInstance }
+export type Binding = {
+	label: string
+	/** Whether React commits are counted. */
+	commits: boolean
+	create(server: BenchServer, container: HTMLElement): BenchInstance
+}

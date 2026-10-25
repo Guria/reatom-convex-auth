@@ -95,3 +95,6 @@ checked; no frontend code changed in between.
       It found that `ConvexClient.onUpdate` is quadratic in subscriptions; the
       binding dispatches by query token instead (1000-query mount 268 → 77 ms)
 - [x] `mise run validate` green (exit 0, 67 tests)
+- [x] @reatom/jsx in the benchmark matrix: the same binding rendered without
+      React (`bench/reatomJsx.tsx`), runtime and bundle size. `mise run bench`
+      passes with three columns.

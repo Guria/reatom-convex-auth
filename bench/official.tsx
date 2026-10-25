@@ -7,6 +7,7 @@ import {
 } from 'convex/react'
 
 import { addNoteFirst, api, CLIENT_URL, counters, type Binding, type Handle } from './fixture'
+import { reactView } from './reactView'
 
 const Item = ({ id }: { id: number }) => {
 	counters.renders++
@@ -41,15 +42,16 @@ const Pages = ({ initialNumItems, handle }: { initialNumItems: number; handle: H
 
 export const official: Binding = {
 	label: 'convex/react',
-	create({ server }) {
+	commits: true,
+	create({ server }, container) {
 		const client = new ConvexReactClient(CLIENT_URL, {
 			webSocketConstructor: server.WebSocket,
 			skipConvexDeploymentUrlCheck: true,
 			unsavedChangesWarning: false,
 		})
-		const provide = (node: React.ReactNode) => (
-			<ConvexProvider client={client}>{node}</ConvexProvider>
-		)
+		const view = reactView(container)
+		const provide = (node: React.ReactNode) =>
+			view.show(<ConvexProvider client={client}>{node}</ConvexProvider>)
 		return {
 			connected: () => client.connectionState().isWebSocketConnected,
 			items: (ids) => provide(ids.map((id) => <Item key={id} id={id} />)),
@@ -58,7 +60,11 @@ export const official: Binding = {
 			list: (handle) => provide(<List handle={handle} />),
 			pages: (initialNumItems, handle) =>
 				provide(<Pages initialNumItems={initialNumItems} handle={handle} />),
-			close: () => client.close(),
+			clear: view.clear,
+			close: () => {
+				view.dispose()
+				return client.close()
+			},
 		}
 	},
 }

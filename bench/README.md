@@ -12,9 +12,16 @@ mise run bench --write    # save it to bench/RESULTS.md
 `scripts/bench.ts` builds `bench/index.html` in production mode, with React's
 profiling build so `<Profiler>` can count commits. It opens the page in
 Chromium with cross-origin isolation, which gives 5µs timers, and calls
-`runBenchmarks`. Both bindings run the same scenarios
-(`bench/official.tsx`, `bench/reatom.tsx`). Every iteration gets a fresh
-server, client and React root, and the two bindings swap which one runs first.
+`runBenchmarks`. Three variants run the same scenarios: convex/react
+(`bench/official.tsx`), the binding rendered by @reatom/react
+(`bench/reatom.tsx`), and the same binding rendered by @reatom/jsx
+(`bench/reatomJsx.tsx`). Every iteration gets a fresh server, client and
+container, and the start order rotates.
+
+@reatom/jsx publishes only the classic `h`/`hf` runtime; its `jsx-runtime`
+entry exports neither `jsx` nor `Fragment`. TypeScript reads the package's JSX
+types through a per-file `@jsxImportSource`, and the bench builds alias the
+runtime to `bench/reatomJsxRuntime.ts`, a three-line adapter over `h`.
 
 The server is `src/shared/mocks/fakeConvexServer.ts`, running in the page. It
 speaks Convex's websocket protocol and answers on later macrotasks, so both
@@ -28,9 +35,24 @@ optimistic mutation and a paginated query.
 
 ## What the numbers say
 
-The two are within a tenth of a millisecond on single queries, mutations,
-optimistic updates and pagination. The gaps show up only when 1000
-subscriptions start, stop or update at once.
+All three are within a few tenths of a millisecond on single queries,
+mutations, optimistic updates and pagination. The gaps show up only when 1000
+subscriptions start, stop or update at once, and they depend more on the view
+layer than on the binding.
+
+With @reatom/jsx:
+
+- **Close to convex/react on lifecycle.** Mount 1.2×, unmount 1.2×, update
+  all 1.0×.
+- **Faster when many elements read one query.** Mount 0.33×, update 0.23×:
+  there is no component layer, so an update writes the bound attributes.
+- **Slower on the 100-item list.** Optimistic update 1.5×, confirmed mutation
+  1.7×. Reactive array children rebuild the whole list on each change; a
+  `reatomLinkedList` is upstream's answer for lists that change often.
+- **Smallest bundle.** The whole app is 30.7 KiB gzip against 86.7 KiB for
+  convex/react, because React is gone.
+
+With @reatom/react:
 
 - **Mount 1000 queries: about 1.3× (+19 ms).** Each query model is several
   atoms plus a connect action per subscription.
@@ -41,8 +63,11 @@ subscriptions start, stop or update at once.
   component notification.
 - **Fewer renders.** The binding renders each item twice on mount, against
   three times for `useQuery`, and commits half as often.
-- **Bundle: +1.4 KiB gzip** for the Convex part over convex/react's, in an app
+- **Bundle: +1.2 KiB gzip** for the Convex part over convex/react's, in an app
   that already ships Reatom. Without Reatom, add its 5.3 KiB.
+
+The same binding runs close to convex/react under @reatom/jsx, so most of the
+@reatom/react gap is per-component work in `reatomComponent`, not the binding.
 
 None of this shows on a page with a few dozen queries. It matters only when
 hundreds of subscriptions start or stop in one frame.
@@ -87,6 +112,8 @@ paginated lists an app usually has.
 
 ## Limits
 
+- The @reatom/jsx runs use the runtime adapter above, not a published
+  automatic runtime.
 - One machine, one browser. Treat the ratios as more meaningful than the
   absolute times.
 - The official pagination column measures the stable `usePaginatedQuery`.

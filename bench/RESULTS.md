@@ -6,41 +6,46 @@ Apple M4 Pro, darwin 27.0.0, Node v24.22.1, Chromium 156.0.8078.4.
 
 ## Runtime
 
-Production builds of both bindings run the same scenarios in one page, each
-iteration on a fresh in-process Convex server (src/shared/mocks/fakeConvexServer.ts),
-client and React root; the bindings alternate which goes first. Times run from
-the action to the DOM change, median with the interquartile range. Renders
-count item component renders; commits count React commits (both as
-convex/react / reatom medians).
+Production builds run the same scenarios in one page for convex/react, the
+Reatom binding rendered by @reatom/react, and the same binding rendered by
+@reatom/jsx. Each iteration gets a fresh in-process Convex server
+(src/shared/mocks/fakeConvexServer.ts), client and container, and the start
+order rotates. Times run from the action to the DOM change, median with the
+interquartile range. Renders count item component renders (for @reatom/jsx,
+recomputes of an item's bound value); commits count React commits. Both list
+medians in column order.
 
-| Scenario           |  convex/react ms |        reatom ms | reatom / official |     renders | commits |
-| ------------------ | ---------------: | ---------------: | ----------------: | ----------: | ------: |
-| mount              | 58.7 (58.1–59.3) | 77.8 (76.7–79.1) |             1.33× | 3000 / 2000 |   4 / 2 |
-| update all         | 3.42 (3.30–4.01) | 7.58 (7.30–8.39) |             2.22× | 1000 / 1000 |   1 / 1 |
-| update one         | 0.71 (0.64–0.84) | 0.82 (0.80–0.88) |             1.16× |       1 / 1 |   1 / 1 |
-| unmount            | 8.95 (8.62–9.13) | 20.1 (19.8–21.4) |             2.25× |           – |       – |
-| shared mount       | 7.69 (7.02–8.31) | 11.1 (10.8–12.9) |             1.44× | 3000 / 2000 |   3 / 2 |
-| shared update      | 2.30 (2.13–2.39) | 3.90 (3.53–4.76) |             1.70× | 1000 / 1000 |   1 / 1 |
-| optimistic shown   | 0.11 (0.10–0.13) | 0.14 (0.12–0.14) |             1.23× |           – |   1 / 1 |
-| mutation confirmed | 0.20 (0.18–0.23) | 0.26 (0.23–0.27) |             1.24× |           – |   2 / 2 |
-| first page         | 0.13 (0.12–0.14) | 0.17 (0.16–0.19) |             1.32× |           – |   3 / 3 |
-| load more          | 0.13 (0.12–0.14) | 0.10 (0.10–0.12) |             0.78× |           – |   3 / 2 |
+| Scenario           |  convex/react ms | @reatom/react ms |   @reatom/jsx ms | @reatom/react / official | @reatom/jsx / official |            renders |   commits |
+| ------------------ | ---------------: | ---------------: | ---------------: | -----------------------: | ---------------------: | -----------------: | --------: |
+| mount              | 58.5 (58.1–59.8) | 80.6 (76.0–81.0) | 71.1 (69.8–73.5) |                    1.38× |                  1.22× | 3000 / 2000 / 2000 | 4 / 2 / – |
+| update all         | 3.45 (3.06–3.91) | 7.85 (7.55–8.38) | 3.50 (3.44–3.58) |                    2.27× |                  1.01× | 1000 / 1000 / 1000 | 1 / 1 / – |
+| update one         | 0.65 (0.59–0.75) | 0.86 (0.81–0.90) | 0.44 (0.39–0.46) |                    1.32× |                  0.68× |          1 / 1 / 1 | 1 / 1 / – |
+| unmount            | 9.19 (8.87–9.38) | 21.3 (19.1–21.8) | 10.9 (10.5–11.2) |                    2.31× |                  1.18× |                  – |         – |
+| shared mount       | 8.35 (7.41–8.65) | 11.7 (11.2–12.9) | 2.78 (2.65–2.88) |                    1.40× |                  0.33× | 3000 / 2000 / 2000 | 3 / 2 / – |
+| shared update      | 2.36 (2.16–2.93) | 4.64 (3.99–5.63) | 0.55 (0.54–0.57) |                    1.97× |                  0.23× | 1000 / 1000 / 1000 | 1 / 1 / – |
+| optimistic shown   | 0.10 (0.10–0.12) | 0.11 (0.10–0.14) | 0.16 (0.15–0.18) |                    1.05× |                  1.52× |                  – | 1 / 1 / – |
+| mutation confirmed | 0.21 (0.18–0.22) | 0.22 (0.21–0.26) | 0.36 (0.33–0.40) |                    1.02× |                  1.69× |                  – | 2 / 2 / – |
+| first page         | 0.13 (0.11–0.14) | 0.17 (0.15–0.19) | 0.12 (0.10–0.13) |                    1.32× |                  0.92× |                  – | 3 / 3 / – |
+| load more          | 0.13 (0.12–0.14) | 0.10 (0.09–0.11) | 0.13 (0.12–0.14) |                    0.73× |                  1.00× |                  – | 3 / 2 / – |
 
 - mount, update all, update one, unmount: 1000 components, each with its own query. Unmount runs until the server holds no subscriptions.
 - shared mount, shared update: 1000 components reading one query.
 - optimistic shown, mutation confirmed: a mutation with the same optimistic update on a 100-item list, until the optimistic and then the server result render.
 - first page, load more: pages of 25. convex/react uses `usePaginatedQuery`; the binding uses the core paginated query client.
+- @reatom/jsx renders lists as reactive array children, which rebuild the list on each change.
 
 ## Bundle size
 
 Minified production builds of equivalent apps (bench/size): client, auth,
 connection state, a skippable query, an optimistic mutation and a paginated
-query. The Convex share of the convex/react app is measured over React; the
-binding's over React + Reatom, which an app using the binding already ships.
+query. Each app's Convex share is measured over its own baseline: React for
+convex/react, React + Reatom or Reatom + @reatom/jsx for the binding.
 
-| Bundle             | min KiB | gzip KiB | brotli KiB | gzip added by Convex |
-| ------------------ | ------: | -------: | ---------: | -------------------: |
-| React              |   213.7 |     65.8 |       56.7 |                      |
-| React + Reatom     |   228.1 |     71.1 |       61.5 |                      |
-| convex/react app   |   288.2 |     86.7 |       74.9 |                +20.9 |
-| Reatom binding app |   306.9 |     93.4 |       81.0 |                +22.3 |
+| Bundle                      | min KiB | gzip KiB | brotli KiB | gzip added by Convex |
+| --------------------------- | ------: | -------: | ---------: | -------------------: |
+| React                       |   213.7 |     65.8 |       56.7 |                      |
+| React + Reatom              |   228.1 |     71.1 |       61.5 |                      |
+| Reatom + @reatom/jsx        |    20.0 |      7.7 |        6.9 |                      |
+| convex/react app            |   288.2 |     86.7 |       74.9 |                +20.9 |
+| Binding + @reatom/react app |   306.9 |     93.2 |       81.0 |                +22.1 |
+| Binding + @reatom/jsx app   |   101.4 |     30.7 |       27.5 |                +23.0 |

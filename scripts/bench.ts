@@ -27,7 +27,17 @@ const config = {
 const root = path.resolve(import.meta.dirname, '..')
 const benchDir = path.join(root, 'bench')
 const outDir = path.join(root, '.var/bench/runtime')
-const LABELS = ['convex/react', 'reatom'] as const
+const OFFICIAL = 'convex/react'
+// See bench/reatomJsxRuntime.ts.
+const resolve = {
+	alias: [
+		{
+			find: /^@reatom\/jsx\/jsx-runtime$/,
+			replacement: path.join(benchDir, 'reatomJsxRuntime.ts'),
+		},
+	],
+}
+const LABELS = [OFFICIAL, '@reatom/react', '@reatom/jsx'] as const
 
 type Sample = { ms: number; renders: number; commits: number }
 type Results = Record<string, Record<string, Sample[]>>
@@ -49,8 +59,13 @@ async function runtime() {
 		root: benchDir,
 		logLevel: 'warn',
 		plugins: [react()],
-		// Production React with <Profiler> callbacks, to count commits.
-		resolve: { alias: [{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' }] },
+		resolve: {
+			alias: [
+				...resolve.alias,
+				// Production React with <Profiler> callbacks, to count commits.
+				{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' },
+			],
+		},
 		build: { outDir, emptyOutDir: true },
 	})
 	const server = await preview({
@@ -92,22 +107,26 @@ async function runtime() {
 }
 
 function runtimeTable(results: Results) {
+	const cell = (samples: Sample[]) => {
+		const sorted = sortedBy(samples, 'ms')
+		return `${ms(quantile(sorted, 0.5))} (${ms(quantile(sorted, 0.25))}–${ms(quantile(sorted, 0.75))})`
+	}
+	const others = LABELS.slice(1)
 	const rows = Object.entries(results).map(([scenario, byLabel]) => {
-		const [official, reatom] = LABELS.map((label) => byLabel[label]!)
-		const cell = (samples: Sample[]) => {
-			const sorted = sortedBy(samples, 'ms')
-			return `${ms(quantile(sorted, 0.5))} (${ms(quantile(sorted, 0.25))}–${ms(quantile(sorted, 0.75))})`
-		}
-		const ratio = median(reatom!, 'ms') / median(official!, 'ms')
+		const official = byLabel[OFFICIAL]!
+		const ratios = others.map(
+			(label) => `${(median(byLabel[label]!, 'ms') / median(official, 'ms')).toFixed(2)}×`,
+		)
 		const counts = (key: keyof Sample) => {
-			const [a, b] = [median(official!, key), median(reatom!, key)]
-			return a === 0 && b === 0 ? '–' : `${a} / ${b}`
+			const values = LABELS.map((label) => median(byLabel[label]!, key))
+			if (values.every((value) => !value)) return '–'
+			return values.map((value) => (Number.isNaN(value) ? '–' : value)).join(' / ')
 		}
-		return `| ${scenario} | ${cell(official!)} | ${cell(reatom!)} | ${ratio.toFixed(2)}× | ${counts('renders')} | ${counts('commits')} |`
+		return `| ${scenario} | ${LABELS.map((label) => cell(byLabel[label]!)).join(' | ')} | ${ratios.join(' | ')} | ${counts('renders')} | ${counts('commits')} |`
 	})
 	return [
-		'| Scenario | convex/react ms | reatom ms | reatom / official | renders | commits |',
-		'|---|---:|---:|---:|---:|---:|',
+		`| Scenario | ${LABELS.map((label) => `${label} ms`).join(' | ')} | ${others.map((label) => `${label} / official`).join(' | ')} | renders | commits |`,
+		`|---|${LABELS.map(() => '---:').join('|')}|${others.map(() => '---:').join('|')}|---:|---:|`,
 		...rows,
 	].join('\n')
 }
@@ -118,6 +137,7 @@ async function bundleSize(entry: string) {
 		root: benchDir,
 		logLevel: 'silent',
 		plugins: [react()],
+		resolve,
 		build: {
 			write: false,
 			minify: true,
@@ -141,8 +161,15 @@ async function bundleSize(entry: string) {
 
 async function sizes() {
 	type Size = Awaited<ReturnType<typeof bundleSize>>
-	const [reactOnly, reactReatom, official, reatom] = await Promise.all(
-		['react.tsx', 'react-reatom.tsx', 'official.tsx', 'reatom.tsx'].map(bundleSize),
+	const [reactOnly, reactReatom, reatomJsxOnly, official, reatom, reatomJsx] = await Promise.all(
+		[
+			'react.tsx',
+			'react-reatom.tsx',
+			'reatom-jsx-baseline.tsx',
+			'official.tsx',
+			'reatom.tsx',
+			'reatom-jsx.tsx',
+		].map(bundleSize),
 	)
 	const kb = (bytes: number) => (bytes / 1024).toFixed(1)
 	const row = (label: string, size: Size | undefined, baseline?: Size) =>
@@ -152,8 +179,10 @@ async function sizes() {
 		'|---|---:|---:|---:|---:|',
 		row('React', reactOnly),
 		row('React + Reatom', reactReatom),
+		row('Reatom + @reatom/jsx', reatomJsxOnly),
 		row('convex/react app', official, reactOnly),
-		row('Reatom binding app', reatom, reactReatom),
+		row('Binding + @reatom/react app', reatom, reactReatom),
+		row('Binding + @reatom/jsx app', reatomJsx, reatomJsxOnly),
 	].join('\n')
 }
 
@@ -166,12 +195,14 @@ ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} c
 
 ## Runtime
 
-Production builds of both bindings run the same scenarios in one page, each
-iteration on a fresh in-process Convex server (src/shared/mocks/fakeConvexServer.ts),
-client and React root; the bindings alternate which goes first. Times run from
-the action to the DOM change, median with the interquartile range. Renders
-count item component renders; commits count React commits (both as
-convex/react / reatom medians).
+Production builds run the same scenarios in one page for convex/react, the
+Reatom binding rendered by @reatom/react, and the same binding rendered by
+@reatom/jsx. Each iteration gets a fresh in-process Convex server
+(src/shared/mocks/fakeConvexServer.ts), client and container, and the start
+order rotates. Times run from the action to the DOM change, median with the
+interquartile range. Renders count item component renders (for @reatom/jsx,
+recomputes of an item's bound value); commits count React commits. Both list
+medians in column order.
 
 ${runtimeTable(results)}
 
@@ -179,13 +210,14 @@ ${runtimeTable(results)}
 - shared mount, shared update: ${config.items} components reading one query.
 - optimistic shown, mutation confirmed: a mutation with the same optimistic update on a 100-item list, until the optimistic and then the server result render.
 - first page, load more: pages of 25. convex/react uses \`usePaginatedQuery\`; the binding uses the core paginated query client.
+- @reatom/jsx renders lists as reactive array children, which rebuild the list on each change.
 
 ## Bundle size
 
 Minified production builds of equivalent apps (bench/size): client, auth,
 connection state, a skippable query, an optimistic mutation and a paginated
-query. The Convex share of the convex/react app is measured over React; the
-binding's over React + Reatom, which an app using the binding already ships.
+query. Each app's Convex share is measured over its own baseline: React for
+convex/react, React + Reatom or Reatom + @reatom/jsx for the binding.
 
 ${await sizes()}
 `
