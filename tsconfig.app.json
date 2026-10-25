@@ -14,5 +14,5 @@
 		},
 		"tsBuildInfoFile": ".var/local/ts/app.tsbuildinfo"
 	},
-	"include": ["src", ".storybook/**/*", "convex/authPaths.ts"]
+	"include": ["src", "bench", ".storybook/**/*", "convex/authPaths.ts"]
 }

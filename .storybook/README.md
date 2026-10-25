@@ -173,13 +173,19 @@ beforeEach: ({ msw }) => msw.use(connectionList.error),
 ## Convex backend in stories
 
 Convex talks over a websocket that MSW cannot intercept, so each story gets an
-in-memory fake deployment (`src/shared/mocks/convexBackend.ts`). The decorator
-sets its transports into the app's injection atoms (`convex.transport`,
-`convexAuthTransport`, `betterAuthClient`). better-auth still runs its real
-client: its HTTP endpoints are MSW handlers (`fakeBetterAuthHandlers`) backed by
-the same fake. Assert on backend state that has no UI through
-`fakeConvexBackend.current`, e.g. `subscriptionCount('notes:list')` to prove a
-private query is not subscribed.
+in-memory deployment (`src/shared/mocks/convexBackend.ts`) on a server that
+speaks Convex's websocket protocol (`fakeConvexServer.ts`). The decorator puts
+a real `ConvexClient` connected to it into `convex.client`, plus
+`convexAuthTransport` and `betterAuthClient`, and closes the client when the
+story unmounts. better-auth still runs its real client: its HTTP endpoints are
+MSW handlers (`fakeBetterAuthHandlers`) backed by the same fake. The
+`seedNotes` parameter adds notes for the restored account.
+
+Assert on backend state that has no UI through `fakeConvexBackend.current`, for
+example `subscriptionCount('notes:list')` to prove a private query is not
+subscribed. Drive server-side events through `fakeConvexBackend.current.server`:
+`setOnline(false)` drops the connection, `expireAuth()` rejects the current
+token so the client refreshes it.
 
 Model distinct meaningful states (success / error / persistent-loading / retry).
 Don't add a state variant that doesn't exercise real behavior.

@@ -171,6 +171,16 @@ run = "nub scripts/convex-smoke.ts"
 description = "Browser journeys for both providers against the running app and Convex backend"
 run = "nub scripts/real-backend-e2e.ts"
 
+[tasks.bench]
+description = "Benchmark convex/react against the Reatom binding (runtime and bundle size)"
+usage = '''
+flag "--items <n>" default="1000" help="Components in many-component scenarios"
+flag "--iterations <n>" default="15" help="Measured iterations per scenario"
+flag "--warmup <n>" default="3" help="Unmeasured iterations first"
+flag "--write" help="Save the report to bench/RESULTS.md"
+'''
+run = "nub scripts/bench.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
+
 [tasks.storybook]
 description = "Start Storybook dev server"
 depends = ["prepare:codegen"]

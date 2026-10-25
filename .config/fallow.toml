@@ -1,4 +1,4 @@
-entry = ["scripts/**/*.ts"]
+entry = ["scripts/**/*.ts", "bench/main.tsx", "bench/size/*.tsx"]
 # `@typescript/native`: TypeScript 7 compiler, not imported by source.
 # `idb-keyval`: optional dependency of @reatom/core. The Storybook/Vite optimizer
 # eagerly analyzes its dynamic import, so the package must remain resolvable.

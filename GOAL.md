@@ -73,5 +73,25 @@ checked; no frontend code changed in between.
       sign-out, sign-in) with zero page errors; `mise run convex:smoke` passes.
       It caught one bug the fake missed: `fetchToken` was handed to Convex
       unwrapped, and Convex calls it from websocket handlers, which threw
-      `missing async stack`. The fake now calls it on a later task and
-      reproduces the bug.
+      `missing async stack`. The real client running against the protocol fake
+      reproduces it.
+
+## Stage 4 — parity with convex/react, benchmark
+
+- [x] binding covers the official hooks: `'skip'`, stable subscription for
+      equal args with cached results shown at once, paginated queries,
+      optimistic updates, actions, preloaded payloads, auth refresh state,
+      connection state. Proof: 11 unit tests in
+      `src/shared/api/convex/reatomConvex.test.ts` against the real `ConvexClient`
+- [x] protocol-level fake server, so stories and unit tests run the real client
+      (`src/shared/mocks/fakeConvexServer.ts`)
+- [x] app uses the new features: paginated notes with "Load more", optimistic
+      add through `insertAtTop`, connection and refresh status. Proof:
+      `src/app/integration/Sync.stories.tsx` (pagination, offline optimistic
+      add, token expiry), `mise run e2e:real` (pinned pages, load more after
+      reload, both providers), `mise run convex:smoke`
+- [x] benchmark: `mise run bench` (runtime in Chromium on production builds,
+      bundle size), results in `bench/RESULTS.md`, analysis in `bench/README.md`.
+      It found that `ConvexClient.onUpdate` is quadratic in subscriptions; the
+      binding dispatches by query token instead (1000-query mount 268 → 77 ms)
+- [x] `mise run validate` green (exit 0, 67 tests)

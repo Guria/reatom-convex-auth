@@ -98,6 +98,34 @@ and `convex/auth.config.ts` lists a single provider. better-auth is mounted at
 `/api/better-auth` because Convex Auth owns `/api/auth`. Every token carries a
 `provider` claim, and `convex/viewer.ts` turns it into the owner key for notes.
 
+## Compared with convex/react
+
+The binding in `src/shared/api/convex/reatomConvex.ts` covers what the
+official React hooks do. It keeps the state in atoms, so routes, loaders and
+tests can read it without a component tree.
+
+| convex/react                             | Binding                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `useQuery(q, args \| "skip")`            | `convex.query(q, () => args \| 'skip', name)`: `data`, `error`, `status` |
+| `usePaginatedQuery`                      | `convex.paginatedQuery(q, () => args, { initialNumItems }, name)`        |
+| `usePreloadedQuery`                      | `convex.preloadedQuery(preloaded, name)`                                 |
+| `useMutation(m).withOptimisticUpdate(u)` | `convex.mutation(m, name, { optimisticUpdate: u })`                      |
+| `useAction`                              | `convex.action(a, name)`                                                 |
+| `useConvexAuth()`                        | `convex.serverAuthenticated`, `convex.isRefreshingAuth`                  |
+| `useConvexConnectionState`               | `convex.connectionState`                                                 |
+| `useConvex`                              | `convex.client`                                                          |
+
+Query errors land in `.error()` and never reach an error boundary. A
+subscription lives while something reads its atom, not while a component is
+mounted. Gating is done by routes reading `sessionStatus` instead of
+`<Authenticated>`. The pagination helpers from `convex/react` work with the
+binding's optimistic updates: the notes page adds notes through `insertAtTop`.
+
+`mise run bench` measures both. Single queries, mutations and pagination come
+out within 0.1 ms of each other. With 1000 subscriptions at once, mounting
+takes 1.3× as long and unmounting 2.9×, mostly from Reatom's connect hooks.
+See [bench/README.md](bench/README.md).
+
 ## Validation
 
 Run the full local quality pipeline (format, lint, typecheck, tests with
@@ -109,9 +137,11 @@ mise run validate
 
 For fast feedback on staged files, prefer `hk check` / `hk fix`.
 
-`validate` never touches a real backend. Stories run against an in-memory
-Convex fake (`src/shared/mocks/convexBackend.ts`), with better-auth's real
-client talking to MSW handlers, and `convex-test` covers the backend functions.
+`validate` never touches a real backend. Stories and unit tests run the real
+Convex client against an in-process server that speaks Convex's websocket
+protocol (`src/shared/mocks/fakeConvexServer.ts`, with app data in
+`convexBackend.ts`). better-auth's real client talks to MSW handlers, and
+`convex-test` covers the backend functions.
 With `convex:dev` and `dev` running, two more checks hit the real thing:
 
 ```bash
