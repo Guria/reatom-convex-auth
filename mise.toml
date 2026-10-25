@@ -167,6 +167,10 @@ run = "nub scripts/convex-env.ts"
 description = "Sign up with both auth providers against the running Convex backend"
 run = "nub scripts/convex-smoke.ts"
 
+[tasks."e2e:real"]
+description = "Browser journeys for both providers against the running app and Convex backend"
+run = "nub scripts/real-backend-e2e.ts"
+
 [tasks.storybook]
 description = "Start Storybook dev server"
 depends = ["prepare:codegen"]

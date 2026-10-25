@@ -67,5 +67,11 @@ checked; no frontend code changed in between.
 - [x] kahraman stories: gate-closed + gate-open for Convex Auth (`src/app/integration/Auth.stories.tsx`)
 - [x] kahraman stories: gate-closed + gate-open for better-auth (same file)
 - [x] steiger clean, `mise run validate` green (exit 0, 54 tests)
-- [ ] README run + provider-switch section
-- [ ] manual check against the real local Convex backend
+- [x] README run + provider-switch section (README: Development, Auth providers)
+- [x] check against the real local Convex backend, automated: `mise run e2e:real`
+      drives both providers in Chromium (sign-up, private note, reload restore,
+      sign-out, sign-in) with zero page errors; `mise run convex:smoke` passes.
+      It caught one bug the fake missed: `fetchToken` was handed to Convex
+      unwrapped, and Convex calls it from websocket handlers, which threw
+      `missing async stack`. The fake now calls it on a later task and
+      reproduces the bug.

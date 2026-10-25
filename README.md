@@ -41,17 +41,62 @@ nub install
 
 ## Development
 
-Start the Vite dev server:
+The app needs a Convex backend. `convex:dev` runs a local deployment on
+127.0.0.1:3210 with no Convex account, pushes `convex/` on every change, and
+writes `VITE_CONVEX_URL` and `VITE_CONVEX_SITE_URL` to `.env.local`. Keep it
+running in its own terminal:
+
+```bash
+mise run convex:dev
+```
+
+On the first run, and whenever the deployment is new, set the variables both
+auth libraries need. The script generates the missing secrets and leaves
+existing ones alone:
+
+```bash
+mise run convex:env
+```
+
+Then start the app at http://localhost:5173:
 
 ```bash
 mise run dev
 ```
+
+The site URL better-auth trusts is `SITE_URL` on the deployment, which defaults
+to `http://localhost:5173`. Run `SITE_URL=... mise run convex:env` on a fresh
+deployment to use another origin.
 
 Start Storybook:
 
 ```bash
 mise run storybook
 ```
+
+## Auth providers
+
+The sign-in page has an "Auth provider" radio group: Convex Auth
+(`@convex-dev/auth`, Password) or Better Auth (`@convex-dev/better-auth`, email
+and password). The choice lives in localStorage and stays fixed while signed
+in. Each provider has its own accounts, so the same email can exist twice.
+
+Both providers run on one deployment. Each library sits behind an adapter in
+`src/shared/api/auth/` that exposes a session atom, sign-in/up/out, and a token
+fetcher. `src/entities/session` hands the active adapter's token to Convex and
+reports `authenticated` only after the backend accepts it. The private notes
+page renders only in that state, so its Convex subscriptions never start for a
+signed-out user.
+
+On the backend, both libraries sign RS256 JWTs with the same issuer
+(`CONVEX_SITE_URL`) and audience (`convex`). Convex checks a token against the
+first provider whose issuer matches, and its OIDC check accepts Convex Auth's
+kid-less tokens only when the JWKS holds one key. So the two
+libraries share one key pair: `convex:env` derives Convex Auth's
+`JWT_PRIVATE_KEY`/`JWKS` and better-auth's static `BETTER_AUTH_JWKS` from it,
+and `convex/auth.config.ts` lists a single provider. better-auth is mounted at
+`/api/better-auth` because Convex Auth owns `/api/auth`. Every token carries a
+`provider` claim, and `convex/viewer.ts` turns it into the owner key for notes.
 
 ## Validation
 
@@ -63,3 +108,13 @@ mise run validate
 ```
 
 For fast feedback on staged files, prefer `hk check` / `hk fix`.
+
+`validate` never touches a real backend. Stories run against an in-memory
+Convex fake (`src/shared/mocks/convexBackend.ts`), with better-auth's real
+client talking to MSW handlers, and `convex-test` covers the backend functions.
+With `convex:dev` and `dev` running, two more checks hit the real thing:
+
+```bash
+mise run convex:smoke  # both providers sign up and read their own notes over HTTP
+mise run e2e:real      # the same journeys in Chromium, including a reload
+```
