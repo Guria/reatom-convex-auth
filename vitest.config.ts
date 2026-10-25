@@ -35,7 +35,9 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reportsDirectory: process.env['COVERAGE_DIR'] ?? '.var/coverage',
-			include: ['src/**/*.{ts,tsx}'],
+			// Backend wiring (auth setup, routes, schema) is covered by `mise run
+			// convex:smoke`; the app-owned function logic is unit-tested here.
+			include: ['src/**/*.{ts,tsx}', 'convex/notes.ts', 'convex/viewer.ts'],
 			exclude: [
 				'src/**/*.stories.tsx',
 				'src/**/*.test.{ts,tsx}',
@@ -55,6 +57,17 @@ export default defineConfig({
 					testTimeout: testTimeout,
 					hookTimeout: testTimeout,
 					environment: 'node',
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: 'convex',
+					include: ['convex/**/*.test.ts'],
+					testTimeout: testTimeout,
+					hookTimeout: testTimeout,
+					environment: 'edge-runtime',
+					server: { deps: { inline: ['convex-test'] } },
 				},
 			},
 			{

@@ -7,6 +7,7 @@
 	"module": "index.ts",
 	"imports": {
 		"#.storybook/*": "./.storybook/*",
+		"#convex/*": "./convex/*",
 		"#styled-system/*": "./src/shared/styled-system/*",
 		"#theme/*": "./theme/*",
 		"#*": "./src/*"
@@ -48,6 +49,7 @@
 		"zod": "4"
 	},
 	"devDependencies": {
+		"@edge-runtime/vm": "^5.0.0",
 		"@feature-sliced/steiger-plugin": "^0.7.0",
 		"@inlang/paraglide-js": "^2.20.2",
 		"@pandacss/dev": "^1.11.4",
@@ -64,6 +66,7 @@
 		"@vitejs/plugin-react": "^6.0.5",
 		"@vitest/browser-playwright": "4.1.10",
 		"@vitest/coverage-v8": "4.1.10",
+		"convex-test": "0.0.65",
 		"fallow": "^3.5.1",
 		"msw-storybook-addon": "^3.0.3",
 		"playwright": "^1.61.1",
