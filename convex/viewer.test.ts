@@ -6,6 +6,7 @@ import { api } from './_generated/api'
 import schema from './schema'
 
 const modules = import.meta.glob('./**/*.ts')
+const firstPage = { paginationOpts: { numItems: 10, cursor: null } }
 
 const convexAuthUser = (session: string) => ({
 	subject: `user1|${session}`,
@@ -17,7 +18,7 @@ const betterAuthUser = { subject: 'user1', provider: 'better-auth', email: 'ada@
 test('anonymous callers have no viewer and no notes', async () => {
 	const t = convexTest(schema, modules)
 	expect(await t.query(api.viewer.current, {})).toBeNull()
-	await expect(t.query(api.notes.list, {})).rejects.toThrow('Not authenticated')
+	await expect(t.query(api.notes.list, firstPage)).rejects.toThrow('Not authenticated')
 	await expect(t.mutation(api.notes.add, { text: 'x' })).rejects.toThrow('Not authenticated')
 })
 
@@ -31,7 +32,9 @@ test('a Convex Auth user keeps their notes across sessions', async () => {
 		provider: 'convex-auth',
 		email: 'ada@example.com',
 	})
-	expect((await nextSession.query(api.notes.list, {})).map((note) => note.text)).toEqual(['first'])
+	expect(
+		(await nextSession.query(api.notes.list, firstPage)).page.map((note) => note.text),
+	).toEqual(['first'])
 })
 
 test('providers are separate owners even for the same email and subject', async () => {
@@ -40,7 +43,9 @@ test('providers are separate owners even for the same email and subject', async 
 	const betterAuth = t.withIdentity(betterAuthUser)
 	await betterAuth.mutation(api.notes.add, { text: 'better' })
 
-	expect((await betterAuth.query(api.notes.list, {})).map((note) => note.text)).toEqual(['better'])
+	expect((await betterAuth.query(api.notes.list, firstPage)).page.map((note) => note.text)).toEqual(
+		['better'],
+	)
 	expect(await betterAuth.query(api.viewer.current, {})).toMatchObject({
 		owner: 'better-auth:user1',
 	})

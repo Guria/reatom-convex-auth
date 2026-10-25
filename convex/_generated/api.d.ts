@@ -41,13 +41,28 @@ export declare const api: {
     list: FunctionReference<
       "query",
       "public",
-      {},
-      Array<{
-        _creationTime: number;
-        _id: Id<"notes">;
-        owner: string;
-        text: string;
-      }>
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+      },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: Id<"notes">;
+          owner: string;
+          text: string;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
     >;
   };
   viewer: {

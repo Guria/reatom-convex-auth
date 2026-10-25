@@ -1,33 +1,22 @@
-// In-memory stand-in for the Convex deployment in stories. Convex speaks a
-// websocket protocol MSW cannot intercept, so the app's transports are
-// replaced instead; better-auth's HTTP endpoints are still mocked with MSW so
-// its real client and cross-domain plugin run. Tokens are unsigned JWTs with
-// the same claims the real backend issues (convex/auth.ts, convex/betterAuth.ts).
-import type { AuthProviderId, ConvexAuthTransport, ConvexTransport } from '#shared/api'
-import type { FunctionReference, FunctionReturnType } from 'convex/server'
+// In-memory stand-in for the Convex deployment in stories. The app's real
+// `ConvexClient` talks to it over a fake websocket (see fakeConvexServer.ts);
+// better-auth's HTTP endpoints are mocked with MSW so its real client and
+// cross-domain plugin run. Tokens are unsigned JWTs with the same claims the
+// real backend issues (convex/auth.ts, convex/betterAuth.ts).
+import type { AuthProviderId, ConvexAuthTransport } from '#shared/api'
 
-import { getFunctionName } from 'convex/server'
+import { ConvexClient } from 'convex/browser'
+import { ConvexError } from 'convex/values'
 import { http, HttpResponse } from 'msw'
 
 import { BETTER_AUTH_BASE_PATH } from '#convex/authPaths'
 
+import { createFakeConvexServer, fakeJwt, paginate, readFakeJwt } from './fakeConvexServer'
+
 export const FAKE_CONVEX_SITE_URL = 'https://convex-site.test'
 
 type User = { id: string; provider: AuthProviderId; email: string; password: string }
-type Identity = { owner: string; provider: AuthProviderId; email: string }
 type Note = { _id: string; _creationTime: number; owner: string; text: string }
-type Subscription = { name: string; deliver: () => void }
-
-const base64url = (value: unknown) =>
-	btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-
-const issueJwt = (claims: Record<string, string>) =>
-	`${base64url({ alg: 'none' })}.${base64url(claims)}.fake`
-
-const readClaims = (token: string): Record<string, unknown> => {
-	const payload = token.split('.')[1] ?? ''
-	return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>
-}
 
 const toError = (error: unknown) => (error instanceof Error ? error : new Error(String(error)))
 
@@ -38,8 +27,6 @@ export function createFakeConvexBackend() {
 	const refreshTokens = new Map<string, User>()
 	const betterAuthSessions = new Map<string, User>()
 	const notes: Note[] = []
-	const subscriptions = new Set<Subscription>()
-	let identity: Identity | null = null
 
 	const userKey = (provider: AuthProviderId, email: string) => `${provider}:${email}`
 
@@ -61,95 +48,46 @@ export function createFakeConvexBackend() {
 		const refreshToken = id('refresh')
 		refreshTokens.set(refreshToken, user)
 		const sub = `${user.id}|${id('session')}`
-		return { token: issueJwt({ sub, provider: 'convex-auth', email: user.email }), refreshToken }
+		return { token: fakeJwt({ sub, provider: 'convex-auth', email: user.email }), refreshToken }
 	}
 
-	const verify = (token: string): Identity | null => {
-		const { sub, provider, email } = readClaims(token)
-		if (typeof sub !== 'string' || typeof email !== 'string') return null
-		if (provider !== 'convex-auth' && provider !== 'better-auth') return null
-		const userId = provider === 'convex-auth' ? sub.split('|')[0] : sub
-		return { owner: `${provider}:${userId}`, provider, email }
-	}
-
-	const requireIdentity = () => {
-		if (!identity) throw new Error('Not authenticated')
-		return identity
-	}
-
-	const runQuery = (name: string): unknown => {
-		switch (name) {
-			case 'viewer:current':
-				return identity
-			case 'notes:list': {
-				const { owner } = requireIdentity()
-				return notes.filter((note) => note.owner === owner).toReversed()
-			}
-			default:
-				throw new Error(`Fake backend has no query ${name}`)
-		}
-	}
-
-	const notifyAll = () => subscriptions.forEach((subscription) => subscription.deliver())
-
-	// Answers arrive on a later task, like a network round trip.
-	const later = (fn: () => void) => void setTimeout(fn, 0)
-
-	const transport: ConvexTransport = {
-		onUpdate<Query extends FunctionReference<'query'>>(
-			query: Query,
-			_args: unknown,
-			onResult: (result: FunctionReturnType<Query>) => void,
-			onError: (error: Error) => void,
-		) {
-			const name = getFunctionName(query)
-			const subscription: Subscription = {
-				name,
-				deliver: () => {
-					try {
-						onResult(runQuery(name) as FunctionReturnType<Query>)
-					} catch (error) {
-						onError(toError(error))
-					}
+	// convex/viewer.ts: the owner is the provider plus its user id.
+	const server = createFakeConvexServer({
+		authenticate: (token) => {
+			const { sub, provider, email } = readFakeJwt(token)
+			if (typeof sub !== 'string' || typeof email !== 'string') return 'Invalid token'
+			if (provider !== 'convex-auth' && provider !== 'better-auth') return 'Unknown provider'
+			const userId = provider === 'convex-auth' ? sub.split('|')[0] : sub
+			return { subject: sub, owner: `${provider}:${userId}`, provider, email }
+		},
+		queries: {
+			'viewer:current': ({ identity }) =>
+				identity && {
+					owner: identity['owner'],
+					provider: identity['provider'],
+					email: identity['email'],
 				},
-			}
-			subscriptions.add(subscription)
-			later(() => subscriptions.has(subscription) && subscription.deliver())
-			return () => void subscriptions.delete(subscription)
+			'notes:list': (ctx, { paginationOpts }) => {
+				if (!ctx.identity) throw new ConvexError('Not authenticated')
+				const owner = ctx.identity['owner']
+				const owned = notes.filter((note) => note.owner === owner).toReversed()
+				return paginate(ctx, owned, paginationOpts!)
+			},
 		},
-		async mutation<Mutation extends FunctionReference<'mutation'>>(
-			mutation: Mutation,
-			args: Record<string, unknown>,
-		) {
-			const name = getFunctionName(mutation)
-			if (name !== 'notes:add') throw new Error(`Fake backend has no mutation ${name}`)
-			const { owner } = requireIdentity()
-			const note: Note = {
-				_id: id('note'),
-				_creationTime: Date.now(),
-				owner,
-				text: String(args['text']),
-			}
-			notes.push(note)
-			later(notifyAll)
-			return note._id as FunctionReturnType<Mutation>
+		mutations: {
+			'notes:add': ({ identity }, { text }) => {
+				if (!identity) throw new ConvexError('Not authenticated')
+				const note: Note = {
+					_id: id('note'),
+					_creationTime: Date.now(),
+					owner: String(identity['owner']),
+					text: String(text).trim(),
+				}
+				notes.push(note)
+				return note._id
+			},
 		},
-		// Like the real client, calls fetchToken later from its own callback.
-		setAuth(fetchToken, onChange) {
-			later(async () => {
-				const token = await fetchToken({ forceRefreshToken: false })
-				identity = token ? verify(token) : null
-				later(() => {
-					onChange(identity !== null)
-					notifyAll()
-				})
-			})
-		},
-		clearAuth() {
-			identity = null
-			later(notifyAll)
-		},
-	}
+	})
 
 	const convexAuth: ConvexAuthTransport = {
 		async signIn({ params, refreshToken }) {
@@ -206,7 +144,7 @@ export function createFakeConvexBackend() {
 			const user = betterAuthSession(cookie)
 			if (!user) return HttpResponse.json(null, { status: 401 })
 			return HttpResponse.json({
-				token: issueJwt({ sub: user.id, provider: 'better-auth', email: user.email }),
+				token: fakeJwt({ sub: user.id, provider: 'better-auth', email: user.email }),
 			})
 		},
 		signOut: (cookie: string | null) => {
@@ -224,17 +162,34 @@ export function createFakeConvexBackend() {
 	}
 
 	return {
-		transport,
+		server,
+		/** A real Convex client connected to this deployment. */
+		createClient: () =>
+			new ConvexClient('https://fake.convex.cloud', {
+				webSocketConstructor: server.WebSocket,
+				skipConvexDeploymentUrlCheck: true,
+				unsavedChangesWarning: false,
+			}),
 		convexAuth,
 		betterAuth,
 		/** Seeds a Convex Auth account and returns tokens for a restored session. */
 		seedConvexAuthSession(email: string, password: string) {
 			return convexAuthTokens(createUser('convex-auth', email, password))
 		},
-		/** Active `onUpdate` subscriptions to a query, e.g. `notes:list`. */
-		subscriptionCount: (name: string) =>
-			[...subscriptions].filter((subscription) => subscription.name === name).length,
-		noteTexts: () => notes.map((note) => note.text),
+		/** Seeds notes for the Convex Auth account with `email`, oldest first. */
+		seedNotes(email: string, texts: string[]) {
+			const user = users.get(userKey('convex-auth', email))
+			if (!user) throw new Error(`No Convex Auth account for ${email}`)
+			for (const text of texts)
+				notes.push({
+					_id: id('note'),
+					_creationTime: Date.now(),
+					owner: `convex-auth:${user.id}`,
+					text,
+				})
+		},
+		/** Server-side subscriptions to a query, e.g. `notes:list`. */
+		subscriptionCount: server.subscriptionCount,
 	}
 }
 

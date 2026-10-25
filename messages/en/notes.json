@@ -8,5 +8,7 @@
 	"notes_empty": "No notes yet. Add the first one.",
 	"notes_loading": "Loading notes",
 	"notes_error_title": "Could not load notes",
-	"notes_add_error": "Could not add the note"
+	"notes_add_error": "Could not add the note",
+	"notes_load_more": "Load more",
+	"notes_loading_more": "Loading more notes"
 }

@@ -1,9 +1,8 @@
-import type { NotesPageModel } from '#pages/notes/model/notesPage'
-
 import { wrap } from '@reatom/core'
 import { bindField, reatomComponent } from '@reatom/react'
 
 import { authProviderLabel } from '#entities/session'
+import { NOTES_PAGE_SIZE, type NotesPageModel } from '#pages/notes/model/notesPage'
 import { m } from '#paraglide/messages.js'
 import { Alert, Button, Field, Heading, Input, Skeleton, Text } from '#shared/components'
 import { styled } from '#styled-system/jsx'
@@ -31,8 +30,8 @@ const NoteList = reatomComponent(({ notes }: Pick<NotesPageModel, 'notes'>) => {
 			</Alert.Root>
 		)
 	}
-	const list = notes.data()
-	if (!list) {
+	const status = notes.status()
+	if (status === 'LoadingFirstPage' || status === 'Skipped') {
 		return (
 			<styled.div role="status" aria-label={m.notes_loading()} display="grid" gap="2">
 				<Skeleton h="10" />
@@ -40,22 +39,36 @@ const NoteList = reatomComponent(({ notes }: Pick<NotesPageModel, 'notes'>) => {
 			</styled.div>
 		)
 	}
+	const list = notes.results()
 	if (list.length === 0) return <Text color="muted">{m.notes_empty()}</Text>
 	return (
-		<styled.ul aria-label={m.notes_title()} display="grid" gap="2">
-			{list.map((note) => (
-				<styled.li
-					key={note._id}
-					p="3"
-					borderWidth="1px"
-					borderColor="border"
-					borderRadius="md"
-					bg="bg.default"
+		<styled.div display="flex" flexDirection="column" gap="3">
+			<styled.ul aria-label={m.notes_title()} display="grid" gap="2">
+				{list.map((note) => (
+					<styled.li
+						key={note._id}
+						p="3"
+						borderWidth="1px"
+						borderColor="border"
+						borderRadius="md"
+						bg="bg.default"
+					>
+						{note.text}
+					</styled.li>
+				))}
+			</styled.ul>
+			{status !== 'Exhausted' && (
+				<Button
+					variant="outline"
+					alignSelf="flex-start"
+					loading={status === 'LoadingMore'}
+					loadingText={m.notes_loading_more()}
+					onClick={wrap(() => notes.loadMore(NOTES_PAGE_SIZE))}
 				>
-					{note.text}
-				</styled.li>
-			))}
-		</styled.ul>
+					{m.notes_load_more()}
+				</Button>
+			)}
+		</styled.div>
 	)
 }, 'NoteList')
 

@@ -60,6 +60,7 @@ async function setupMswWorker() {
 	return worker
 }
 
+const NO_NOTES: string[] = []
 const SEEDED_USER = { email: 'alex@example.com', password: 'correct-horse' }
 const convexAuthKeys = convexAuthStorageKeys('convexAuth')
 // Auth state persisted by the adapters; each story gets a new fake backend.
@@ -73,7 +74,7 @@ const AUTH_STORAGE_KEYS = [
 
 // A fresh in-memory Convex deployment per story. `authenticated` stories
 // start with a restored Convex Auth session, as after a page reload.
-const startFakeBackend = (authenticated: boolean) => {
+const startFakeBackend = (authenticated: boolean, seedNotes: string[]) => {
 	AUTH_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key))
 	const backend = createFakeConvexBackend()
 	fakeConvexBackend.current = backend
@@ -81,6 +82,7 @@ const startFakeBackend = (authenticated: boolean) => {
 		const tokens = backend.seedConvexAuthSession(SEEDED_USER.email, SEEDED_USER.password)
 		window.localStorage.setItem(convexAuthKeys.token, tokens.token)
 		window.localStorage.setItem(convexAuthKeys.refreshToken, tokens.refreshToken)
+		backend.seedNotes(SEEDED_USER.email, seedNotes)
 	}
 	return backend
 }
@@ -89,9 +91,11 @@ function ReatomDecorator({
 	children,
 	initialPath = '',
 	authenticated = true,
+	seedNotes = NO_NOTES,
 	provider,
 }: PropsWithChildren<{
 	authenticated?: boolean
+	seedNotes?: string[]
 	initialPath?: string
 	provider?: AuthProviderId
 }>) {
@@ -103,23 +107,28 @@ function ReatomDecorator({
 		if ((globalThis as Record<string, unknown>)['__vitest_worker__']) {
 			window.localStorage.clear()
 		}
-		const backend = startFakeBackend(authenticated)
-		return setupStorybookUrl(initialPath, () => {
-			convex.transport.set(backend.transport)
+		const backend = startFakeBackend(authenticated, seedNotes)
+		const client = backend.createClient()
+		const storyFrame = setupStorybookUrl(initialPath, () => {
+			convex.client.set(client)
 			convexAuthTransport.set(backend.convexAuth)
 			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
 			if (provider) authProvider.set(provider)
 		})
-	}, [authenticated, initialPath, provider])
+		return { storyFrame, client, backend }
+	}, [authenticated, initialPath, provider, seedNotes])
 
 	useEffect(() => {
 		return () => {
+			// The client reconnects on its own until closed.
+			void frame.client.close()
+			frame.backend.server.close()
 			clearAbortErrors()
 			queueMicrotask(clearAbortErrors)
 		}
 	}, [frame])
 
-	return <reatomContext.Provider value={frame}>{children}</reatomContext.Provider>
+	return <reatomContext.Provider value={frame.storyFrame}>{children}</reatomContext.Provider>
 }
 
 const preview = definePreview({
@@ -128,6 +137,7 @@ const preview = definePreview({
 		(Story, { parameters }) => (
 			<ReatomDecorator
 				authenticated={parameters['authenticated']}
+				seedNotes={parameters['seedNotes']}
 				initialPath={parameters['initialPath']}
 				provider={parameters['authProvider']}
 			>

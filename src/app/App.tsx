@@ -13,6 +13,7 @@ import { styled } from '#styled-system/jsx'
 import { AppShell } from '#widgets/app-shell'
 
 import { AccountMenu } from './AccountMenu'
+import { ConnectionStatus } from './ConnectionStatus'
 import { HeaderBreadcrumbs } from './HeaderBreadcrumbs'
 import { MobileHeader } from './MobileHeader'
 import { SidebarNavigation } from './SidebarNavigation'
@@ -82,6 +83,7 @@ export const App = reatomComponent(() => {
 				mobileHeader={<MobileHeader />}
 				breadcrumbs={<HeaderBreadcrumbs />}
 			>
+				<ConnectionStatus />
 				{content}
 			</AppShell>
 			<Toaster />

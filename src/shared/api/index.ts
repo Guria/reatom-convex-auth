@@ -92,5 +92,4 @@ export {
 	reatomConvexAuthAdapter,
 	type ConvexAuthTransport,
 } from './auth/convexAuth'
-export type { ConvexTransport } from './convex/transport'
 export { betterAuthClient, convex, convexAuthTransport } from './backend'

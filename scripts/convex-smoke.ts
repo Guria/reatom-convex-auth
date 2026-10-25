@@ -66,9 +66,10 @@ async function asUser(token: string) {
 	return client
 }
 
+const firstPage = { paginationOpts: { numItems: 10, cursor: null } }
 const anonymous = new ConvexHttpClient(url)
 check((await anonymous.query(api.viewer.current, {})) === null, 'anonymous viewer is null')
-const rejected = await anonymous.query(api.notes.list, {}).then(
+const rejected = await anonymous.query(api.notes.list, firstPage).then(
 	() => false,
 	() => true,
 )
@@ -84,8 +85,8 @@ check(baViewer?.provider === 'better-auth', 'better-auth token is accepted, prov
 
 await convexAuthUser.mutation(api.notes.add, { text: 'from convex-auth' })
 await betterAuthUser.mutation(api.notes.add, { text: 'from better-auth' })
-const caNotes = await convexAuthUser.query(api.notes.list, {})
-const baNotes = await betterAuthUser.query(api.notes.list, {})
+const { page: caNotes } = await convexAuthUser.query(api.notes.list, firstPage)
+const { page: baNotes } = await betterAuthUser.query(api.notes.list, firstPage)
 check(
 	caNotes.length === 1 && caNotes[0]?.text === 'from convex-auth',
 	'convex-auth user sees only own note',

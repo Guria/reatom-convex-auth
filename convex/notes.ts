@@ -1,21 +1,20 @@
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
 import schema from './schema'
 import { requireViewer } from './viewer'
 
-const NOTES_LIMIT = 100
-
 export const list = query({
-	args: {},
-	returns: v.array(schema.doc('notes')),
-	handler: async (ctx) => {
+	args: { paginationOpts: paginationOptsValidator },
+	returns: paginationResultValidator(schema.doc('notes')),
+	handler: async (ctx, { paginationOpts }) => {
 		const { owner } = await requireViewer(ctx)
 		return ctx.db
 			.query('notes')
 			.withIndex('by_owner', (q) => q.eq('owner', owner))
 			.order('desc')
-			.take(NOTES_LIMIT)
+			.paginate(paginationOpts)
 	},
 })
 
