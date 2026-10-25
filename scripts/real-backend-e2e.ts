@@ -14,6 +14,16 @@ const providers = [
 
 const step = (message: string) => console.log(`  ${message}`)
 
+// src/pages/notes/model/notesPage.ts
+const PAGE_SIZE = 10
+
+async function addNote(page: Page, text: string) {
+	await page.getByLabel('New note').fill(text)
+	await page.getByRole('button', { name: 'Add note' }).click()
+	await page.getByRole('list', { name: 'Notes' }).getByText(text, { exact: true }).waitFor()
+	await page.getByRole('button', { name: 'Add note' }).waitFor()
+}
+
 async function signOut(page: Page, email: string) {
 	await page.getByRole('button', { name: new RegExp(email) }).click()
 	await page.getByRole('menuitem', { name: /Sign out/ }).click()
@@ -35,9 +45,7 @@ async function journey(page: Page, { label, email }: (typeof providers)[number])
 	step('signed up; backend identifies the provider')
 
 	const note = `note from ${label} ${stamp}`
-	await page.getByLabel('New note').fill(note)
-	await page.getByRole('button', { name: 'Add note' }).click()
-	await page.getByRole('list', { name: 'Notes' }).getByText(note).waitFor()
+	await addNote(page, note)
 	step('added a private note')
 
 	await page.reload()
@@ -53,6 +61,19 @@ async function journey(page: Page, { label, email }: (typeof providers)[number])
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await page.getByRole('list', { name: 'Notes' }).getByText(note).waitFor()
 	step('signed back in and sees the note')
+
+	// A loaded page keeps its end, so it grows instead of pushing the note out.
+	for (let index = 1; index <= PAGE_SIZE; index++) await addNote(page, `filler ${index}`)
+	const notes = page.getByRole('list', { name: 'Notes' })
+	await notes.getByText(note).waitFor()
+	step('a loaded page grows as notes are added')
+
+	await page.reload()
+	await notes.getByText(`filler ${PAGE_SIZE}`, { exact: true }).waitFor()
+	await notes.getByText(note).waitFor({ state: 'detached' })
+	await page.getByRole('button', { name: 'Load more' }).click()
+	await notes.getByText(note).waitFor()
+	step('after a reload the oldest note is on the second page')
 
 	await signOut(page, email)
 }
