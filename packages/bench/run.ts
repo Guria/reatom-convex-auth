@@ -34,11 +34,9 @@ const benchDir = import.meta.dirname
 const outDir = path.resolve(benchDir, '../../.var/bench/runtime')
 const OFFICIAL = 'convex/react'
 const REATOM_PACKAGES = ['@reatom/core', '@reatom/react', '@reatom/jsx']
-// See reatomJsxRuntime.ts.
-const jsxRuntime = {
-	find: /^@reatom\/jsx\/jsx-runtime$/,
-	replacement: path.join(benchDir, 'reatomJsxRuntime.ts'),
-}
+const JSX_RUNTIME = '@reatom/jsx/jsx-runtime'
+// Stands in for a jsx-runtime entry that exports only `h`/`hf`.
+const jsxRuntimeAdapter = path.join(benchDir, 'reatomJsxRuntime.ts')
 
 type Sample = { ms: number; renders: number; commits: number }
 type Results = Record<string, Record<string, Sample[]>>
@@ -55,39 +53,56 @@ const packageDir = (id: string, pkg: string) => {
 	return path.join(id.slice(0, end), 'node_modules', pkg)
 }
 
+const reatomPackage = (source: string) =>
+	REATOM_PACKAGES.find((id) => source === id || source.startsWith(`${id}/`))
+
+const lacksJsx = (file: string) => !/export\s*\{[^}]*\bjsx\b/.test(readFileSync(file, 'utf8'))
+
+// URL and path specs (pkg.pr.new previews) say more than the version.
+const specNote = (spec: string | undefined) => (spec?.includes('/') ? ` (${spec})` : '')
+
 /**
  * A set of installed @reatom/* packages. Its plugin resolves every @reatom/*
  * import from `dir`, so a page or bundle never mixes two Reatom copies, and
- * records the package directories the builds used.
+ * records the package directories the builds used. A jsx-runtime entry
+ * without `jsx` resolves to the adapter.
  */
 function reatomBuild(name: string, dir: string) {
 	const used = new Map<string, Set<string>>()
+	let adapted = false
+	const record = (pkg: string, id: string) =>
+		used.set(pkg, (used.get(pkg) ?? new Set<string>()).add(packageDir(id, pkg)))
+	const adapt = <Resolved extends { id: string }>(source: string, resolved: Resolved) => {
+		if (source !== JSX_RUNTIME || !lacksJsx(resolved.id)) return resolved
+		adapted = true
+		return jsxRuntimeAdapter
+	}
 	const plugin: Plugin = {
 		name: `reatom-${name}`,
 		enforce: 'pre',
 		async resolveId(source) {
-			const pkg = REATOM_PACKAGES.find((id) => source === id || source.startsWith(`${id}/`))
+			const pkg = reatomPackage(source)
 			if (!pkg) return
 			const resolved = await this.resolve(source, path.join(dir, 'package.json'), {
 				skipSelf: true,
 			})
 			if (!resolved) throw new Error(`${name}: cannot resolve ${source} from ${dir}`)
-			used.set(pkg, (used.get(pkg) ?? new Set<string>()).add(packageDir(resolved.id, pkg)))
-			return resolved
+			record(pkg, resolved.id)
+			return adapt(source, resolved)
 		},
+	}
+	const label = (pkg: string, roots: Set<string>, spec: string | undefined) => {
+		if (roots.size > 1) throw new Error(`${name}: two copies of ${pkg}: ${[...roots]}`)
+		const { version } = readPackage([...roots][0]!)
+		const adapter = pkg === '@reatom/jsx' && adapted ? ' with the JSX runtime adapter' : ''
+		return `${pkg} ${version}${specNote(spec)}${adapter}`
 	}
 	/** `@reatom/core 1001.3.0, …`, from the packages the builds used. */
 	const describe = () => {
 		const specs = readPackage(dir).dependencies ?? {}
 		const order = ([a]: [string, unknown], [b]: [string, unknown]) =>
 			REATOM_PACKAGES.indexOf(a) - REATOM_PACKAGES.indexOf(b)
-		return [...used].sort(order).map(([pkg, roots]) => {
-			if (roots.size > 1) throw new Error(`${name}: two copies of ${pkg}: ${[...roots]}`)
-			const { version } = readPackage([...roots][0]!)
-			// URL and path specs (pkg.pr.new previews) say more than the version.
-			const spec = specs[pkg]
-			return `${pkg} ${version}${spec?.includes('/') ? ` (${spec})` : ''}`
-		})
+		return [...used].sort(order).map(([pkg, roots]) => label(pkg, roots, specs[pkg]))
 	}
 	return { name, dir, plugin, describe }
 }
@@ -126,11 +141,8 @@ async function buildPage(reatom: ReatomBuild) {
 		logLevel: 'warn',
 		plugins: [react(), reatom.plugin],
 		resolve: {
-			alias: [
-				jsxRuntime,
-				// Production React with <Profiler> callbacks, to count commits.
-				{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' },
-			],
+			// Production React with <Profiler> callbacks, to count commits.
+			alias: [{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' }],
 		},
 		build: { outDir: pageDir, emptyOutDir: true },
 	})
@@ -263,7 +275,6 @@ async function bundleSize(entry: string, reatom?: ReatomBuild) {
 		root: benchDir,
 		logLevel: 'silent',
 		plugins: [react(), ...(reatom ? [reatom.plugin] : [])],
-		resolve: { alias: [jsxRuntime] },
 		build: {
 			write: false,
 			minify: true,

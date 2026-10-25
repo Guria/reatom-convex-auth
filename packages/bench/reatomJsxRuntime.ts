@@ -1,6 +1,6 @@
-// @reatom/jsx compiles with the classic `h`/`hf`: its `jsx-runtime` entry
-// exports neither `jsx` nor `Fragment`. TypeScript reads the package's JSX
-// types through `@jsxImportSource`; the bench builds alias the runtime here.
+// An automatic JSX runtime over the classic `h`/`hf`, for @reatom/jsx builds
+// whose `jsx-runtime` entry exports neither `jsx` nor `Fragment`. run.ts
+// resolves the runtime here only for those builds.
 import { h, hf } from '@reatom/jsx'
 
 type Props = Record<string, unknown> & { children?: unknown }
