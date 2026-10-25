@@ -4,8 +4,8 @@
 	"private": true,
 	"description": "The Reatom build the benchmark runs as `next`",
 	"dependencies": {
-		"@reatom/core": "1001.2.0",
-		"@reatom/jsx": "1001.2.0",
-		"@reatom/react": "1001.0.0"
+		"@reatom/core": "https://pkg.pr.new/@reatom/core@45b31c8",
+		"@reatom/jsx": "https://pkg.pr.new/@reatom/jsx@45b31c8",
+		"@reatom/react": "https://pkg.pr.new/@reatom/react@45b31c8"
 	}
 }

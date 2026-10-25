@@ -6,8 +6,8 @@ Apple M4 Pro, darwin 27.0.0, Node v24.22.1, Chromium 156.0.8078.4.
 
 Reatom builds, as bundled into their pages and size apps:
 
-- stable (packages/bench): @reatom/core 1001.3.0, @reatom/react 1001.0.1, @reatom/jsx 1001.3.0. The page reports `VERSION` 1001.
-- next (packages/reatom-next): @reatom/core 1001.2.0, @reatom/react 1001.0.0, @reatom/jsx 1001.2.0. The page reports `VERSION` 1001.
+- stable (packages/bench): @reatom/core 1001.3.0, @reatom/react 1001.0.1, @reatom/jsx 1001.3.0 with the JSX runtime adapter. The page reports `VERSION` 1001.
+- next (packages/reatom-next): @reatom/core 1001.3.0 (https://pkg.pr.new/@reatom/core@45b31c8), @reatom/react 1001.0.1 (https://pkg.pr.new/@reatom/react@45b31c8), @reatom/jsx 1001.3.0 (https://pkg.pr.new/@reatom/jsx@45b31c8). The page reports `VERSION` 1001.
 
 ## Runtime
 
@@ -23,31 +23,31 @@ Median ms, with the ratio to convex/react:
 
 | Scenario           | convex/react | @reatom/react stable | @reatom/react next | @reatom/jsx stable | @reatom/jsx next |
 | ------------------ | -----------: | -------------------: | -----------------: | -----------------: | ---------------: |
-| mount              |         58.8 |         76.1 (1.29×) |       77.4 (1.32×) |       70.9 (1.21×) |     72.5 (1.23×) |
-| update all         |         3.09 |         6.98 (2.26×) |       6.61 (2.14×) |       3.46 (1.12×) |     3.37 (1.09×) |
-| update one         |         0.63 |         0.74 (1.17×) |       0.69 (1.10×) |       0.34 (0.54×) |     0.33 (0.53×) |
-| unmount            |         8.49 |         20.2 (2.38×) |       17.7 (2.09×) |       10.1 (1.19×) |     9.97 (1.17×) |
-| shared mount       |         6.99 |         10.2 (1.45×) |       9.92 (1.42×) |       2.57 (0.37×) |     2.69 (0.38×) |
-| shared update      |         2.16 |         3.44 (1.59×) |       3.23 (1.49×) |       0.53 (0.24×) |     0.52 (0.24×) |
-| optimistic shown   |         0.12 |         0.14 (1.17×) |       0.14 (1.17×) |       0.17 (1.42×) |     0.35 (2.92×) |
-| mutation confirmed |         0.22 |         0.27 (1.20×) |       0.29 (1.29×) |       0.38 (1.69×) |     0.95 (4.22×) |
-| first page         |         0.25 |         0.24 (0.98×) |       0.31 (1.29×) |       0.20 (0.80×) |     0.28 (1.14×) |
-| load more          |         0.15 |         0.11 (0.73×) |       0.12 (0.80×) |       0.15 (1.03×) |     0.51 (3.43×) |
+| mount              |         57.3 |         74.4 (1.30×) |       76.6 (1.34×) |       70.2 (1.23×) |     70.5 (1.23×) |
+| update all         |         3.32 |         6.88 (2.07×) |       6.32 (1.90×) |       3.53 (1.06×) |     3.55 (1.07×) |
+| update one         |         0.61 |         0.65 (1.08×) |       0.69 (1.14×) |       0.33 (0.55×) |     0.35 (0.59×) |
+| unmount            |         8.49 |         20.4 (2.41×) |       11.9 (1.40×) |       10.1 (1.19×) |     9.99 (1.18×) |
+| shared mount       |         6.33 |         9.34 (1.48×) |       9.35 (1.48×) |       2.48 (0.39×) |     2.49 (0.39×) |
+| shared update      |         2.01 |         3.00 (1.49×) |       2.95 (1.47×) |       0.51 (0.25×) |     0.51 (0.26×) |
+| optimistic shown   |         0.11 |         0.12 (1.09×) |       0.13 (1.18×) |       0.16 (1.45×) |     0.16 (1.45×) |
+| mutation confirmed |         0.21 |         0.25 (1.16×) |       0.25 (1.19×) |       0.37 (1.70×) |     0.36 (1.67×) |
+| first page         |         0.19 |         0.20 (1.05×) |       0.25 (1.28×) |       0.16 (0.82×) |     0.19 (0.97×) |
+| load more          |         0.14 |         0.11 (0.72×) |       0.11 (0.76×) |       0.13 (0.90×) |     0.14 (1.00×) |
 
 Interquartile range, ms:
 
 | Scenario           | convex/react | @reatom/react stable | @reatom/react next | @reatom/jsx stable | @reatom/jsx next |
 | ------------------ | -----------: | -------------------: | -----------------: | -----------------: | ---------------: |
-| mount              |    58.0–59.5 |            73.9–77.9 |          74.7–78.2 |          69.9–72.4 |        68.9–74.4 |
-| update all         |    3.03–3.39 |            6.15–7.73 |          6.29–6.90 |          3.38–3.73 |        3.18–3.55 |
-| update one         |    0.59–0.70 |            0.67–0.80 |          0.66–0.73 |          0.32–0.41 |        0.32–0.37 |
-| unmount            |    8.09–8.72 |            18.5–21.7 |          14.8–19.5 |          9.68–10.7 |        9.70–10.5 |
-| shared mount       |    6.58–7.40 |            8.86–11.6 |          9.46–10.8 |          2.53–2.66 |        2.50–5.39 |
-| shared update      |    1.85–2.31 |            2.66–3.63 |          2.93–4.03 |          0.50–0.56 |        0.51–0.54 |
-| optimistic shown   |    0.11–0.12 |            0.13–0.16 |          0.13–0.15 |          0.16–0.19 |        0.32–0.97 |
-| mutation confirmed |    0.20–0.23 |            0.25–0.31 |          0.27–0.32 |          0.37–0.41 |        0.91–2.29 |
-| first page         |    0.22–0.26 |            0.22–0.26 |          0.28–0.33 |          0.19–0.22 |        0.25–0.38 |
-| load more          |    0.13–0.16 |            0.10–0.12 |          0.11–0.13 |          0.14–0.16 |        0.49–0.90 |
+| mount              |    55.1–58.4 |            71.5–75.2 |          74.9–77.7 |          67.8–71.0 |        69.1–72.0 |
+| update all         |    3.11–3.69 |            5.83–7.14 |          5.93–6.75 |          3.49–3.75 |        3.39–3.71 |
+| update one         |    0.57–0.66 |            0.62–0.76 |          0.65–0.72 |          0.32–0.38 |        0.32–0.36 |
+| unmount            |    8.13–8.77 |            18.9–21.6 |          11.5–12.4 |          9.75–10.6 |        9.88–10.5 |
+| shared mount       |    6.19–7.08 |            9.08–10.5 |          9.02–10.4 |          2.42–2.54 |        2.47–2.62 |
+| shared update      |    1.92–2.21 |            2.80–3.44 |          2.74–3.41 |          0.50–0.53 |        0.50–0.53 |
+| optimistic shown   |    0.11–0.12 |            0.12–0.14 |          0.12–0.14 |          0.15–0.17 |        0.15–0.18 |
+| mutation confirmed |    0.20–0.22 |            0.23–0.27 |          0.25–0.27 |          0.34–0.38 |        0.34–0.38 |
+| first page         |    0.17–0.22 |            0.19–0.23 |          0.23–0.31 |          0.15–0.22 |        0.14–0.22 |
+| load more          |    0.13–0.15 |            0.10–0.11 |          0.10–0.12 |          0.13–0.15 |        0.13–0.15 |
 
 Item renders / React commits, medians. Renders count item component renders
 (for @reatom/jsx, recomputes of an item's bound value):
@@ -83,11 +83,11 @@ React + Reatom or Reatom + @reatom/jsx of the same build for the binding.
 | ---------------------------------- | ------: | -------: | ---------: | -------------------: |
 | React                              |   213.7 |     65.8 |       56.7 |                      |
 | React + Reatom stable              |   228.1 |     71.1 |       61.5 |                      |
-| React + Reatom next                |   227.9 |     71.0 |       61.5 |                      |
+| React + Reatom next                |   228.1 |     71.1 |       61.5 |                      |
 | Reatom + @reatom/jsx stable        |    20.0 |      7.7 |        6.9 |                      |
-| Reatom + @reatom/jsx next          |    21.1 |      7.9 |        7.2 |                      |
+| Reatom + @reatom/jsx next          |    21.1 |      8.1 |        7.3 |                      |
 | convex/react app                   |   288.2 |     86.7 |       74.9 |                +20.9 |
 | Binding + @reatom/react app stable |   306.9 |     93.2 |       81.0 |                +22.1 |
-| Binding + @reatom/react app next   |   306.7 |     93.1 |       81.0 |                +22.1 |
+| Binding + @reatom/react app next   |   307.1 |     93.2 |       81.0 |                +22.1 |
 | Binding + @reatom/jsx app stable   |   101.4 |     30.7 |       27.5 |                +23.0 |
-| Binding + @reatom/jsx app next     |    99.3 |     29.9 |       26.7 |                +21.9 |
+| Binding + @reatom/jsx app next     |   102.7 |     31.1 |       27.8 |                +23.1 |

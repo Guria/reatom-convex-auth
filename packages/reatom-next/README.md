@@ -4,14 +4,20 @@ The Reatom build `mise run bench` runs as `next`, next to the stable one in
 `packages/bench`. Nothing imports this package; the benchmark resolves
 `@reatom/core`, `@reatom/react` and `@reatom/jsx` from its directory.
 
-To compare another build, change those three `dependencies` in
-`package.json`, for example to pkg.pr.new previews:
+It installs the pkg.pr.new preview of commit `45b31c8` on the Reatom branch
+`perf/abort-reason-connect-hook-jsx-runtime`. To compare another build, change
+those three `dependencies` in `package.json` to a release or another preview:
 
 ```json
-"@reatom/core": "https://pkg.pr.new/reatom/reatom/@reatom/core@<sha>",
-"@reatom/react": "https://pkg.pr.new/reatom/reatom/@reatom/react@<sha>",
-"@reatom/jsx": "https://pkg.pr.new/reatom/reatom/@reatom/jsx@<sha>"
+"@reatom/core": "https://pkg.pr.new/@reatom/core@<sha>",
+"@reatom/react": "https://pkg.pr.new/@reatom/react@<sha>",
+"@reatom/jsx": "https://pkg.pr.new/@reatom/jsx@<sha>"
 ```
+
+A preview reports the same version as the release it branched from, so the
+header names the URL too. A hoisting install may put one of them in the root
+`node_modules`; the benchmark still resolves it from here by Node's rules and
+fails if a page would bundle two copies.
 
 `mise run bench` reinstalls on the next run. The report header shows the
 version each build bundled, plus the URL for URL dependencies.
