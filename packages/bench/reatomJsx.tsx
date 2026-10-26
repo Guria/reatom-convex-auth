@@ -6,7 +6,13 @@
 import { mount } from '@reatom/jsx'
 
 import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
-import { nativeModels, reatomModels, type ItemModel, type ReatomModels } from './reatomModels'
+import {
+	nativeModels,
+	patchedModels,
+	reatomModels,
+	type ItemModel,
+	type ReatomModels,
+} from './reatomModels'
 
 const Item = ({ id, model }: { id: number; model: ItemModel }) => (
 	<i
@@ -75,3 +81,4 @@ const jsxBinding = (
 
 export const reatomJsx = jsxBinding('@reatom/jsx', reatomModels)
 export const reatomJsxNative = jsxBinding('@reatom/jsx native', nativeModels)
+export const reatomJsxPatched = jsxBinding('@reatom/jsx patched', patchedModels)

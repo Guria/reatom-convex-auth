@@ -2,7 +2,13 @@ import { reatomComponent, reatomContext } from '@reatom/react'
 
 import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
 import { reactView } from './reactView'
-import { nativeModels, reatomModels, type ItemModel, type ReatomModels } from './reatomModels'
+import {
+	nativeModels,
+	patchedModels,
+	reatomModels,
+	type ItemModel,
+	type ReatomModels,
+} from './reatomModels'
 
 const Item = reatomComponent(({ id, model }: { id: number; model: ItemModel }) => {
 	counters.renders++
@@ -55,3 +61,4 @@ const reactBinding = (
 
 export const reatom = reactBinding('@reatom/react', reatomModels)
 export const reatomNative = reactBinding('@reatom/react native', nativeModels)
+export const reatomPatched = reactBinding('@reatom/react patched', patchedModels)

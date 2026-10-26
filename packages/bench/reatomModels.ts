@@ -2,6 +2,7 @@ import type { Computed, Frame } from '@reatom/core'
 import type { reatomConvex as reatomBinding } from 'reatom-convex'
 
 import { context } from '@reatom/core'
+import { ConvexClient as PatchedConvexClient } from 'convex-patched/browser'
 import { ConvexClient } from 'convex/browser'
 import { reatomConvex } from 'reatom-convex'
 import { reatomConvex as reatomNative, reatomConvexClient } from 'reatom-convex-client'
@@ -44,24 +45,30 @@ const views = (convex: Convex, frame: Frame) => ({
 	},
 })
 
-/** The binding over `convex/browser`'s `ConvexClient`. */
-export function reatomModels({ server }: BenchServer): ReatomModels {
-	const client = new ConvexClient(CLIENT_URL, {
-		webSocketConstructor: server.WebSocket,
-		skipConvexDeploymentUrlCheck: true,
-		unsavedChangesWarning: false,
-	})
-	const frame = context.start()
-	return {
-		frame,
-		connected: () => client.connectionState().isWebSocketConnected,
-		...views(
-			reatomConvex(() => client, 'bench'),
+const sdkModels =
+	(Client: typeof ConvexClient) =>
+	({ server }: BenchServer): ReatomModels => {
+		const client = new Client(CLIENT_URL, {
+			webSocketConstructor: server.WebSocket,
+			skipConvexDeploymentUrlCheck: true,
+			unsavedChangesWarning: false,
+		})
+		const frame = context.start()
+		return {
 			frame,
-		),
-		close: () => client.close(),
+			connected: () => client.connectionState().isWebSocketConnected,
+			...views(
+				reatomConvex(() => client, 'bench'),
+				frame,
+			),
+			close: () => client.close(),
+		}
 	}
-}
+
+/** The binding over `convex/browser`'s `ConvexClient`. */
+export const reatomModels = sdkModels(ConvexClient)
+/** The binding over `ConvexClient` with packages/convex-patched applied. */
+export const patchedModels = sdkModels(PatchedConvexClient)
 
 /** The same API over the client whose state lives in atoms. */
 export function nativeModels({ server }: BenchServer, options: ModelOptions): ReatomModels {

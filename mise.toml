@@ -190,8 +190,9 @@ flag "--write" help="Save the report and raw samples in packages/bench"
 flag "--matched" help="Compare the matched upstream base with the safe patches"
 flag "--native" help="Compare the binding with the native client on stable Reatom"
 flag "--unbatched" help="Disable native query-set batching for a matched-message control"
+flag "--patched" help="Add convex/react and the binding on the patched convex SDK"
 '''
-run = "nub packages/bench/run.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write} ${usage_matched:+--matched} ${usage_native:+--native} ${usage_unbatched:+--unbatched}"
+run = "nub packages/bench/run.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write} ${usage_matched:+--matched} ${usage_native:+--native} ${usage_unbatched:+--unbatched} ${usage_patched:+--patched}"
 
 [tasks.storybook]
 description = "Start Storybook dev server"

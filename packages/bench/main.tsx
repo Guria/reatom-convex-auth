@@ -13,9 +13,9 @@ import {
 	type Binding,
 	type Handle,
 } from './fixture'
-import { official } from './official'
-import { reatom, reatomNative } from './reatom'
-import { reatomJsx, reatomJsxNative } from './reatomJsx'
+import { official, officialPatched } from './official'
+import { reatom, reatomNative, reatomPatched } from './reatom'
+import { reatomJsx, reatomJsxNative, reatomJsxPatched } from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
@@ -27,7 +27,16 @@ type Config = {
 }
 type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
-const allBindings = [official, reatom, reatomNative, reatomJsx, reatomJsxNative]
+const allBindings = [
+	official,
+	officialPatched,
+	reatom,
+	reatomNative,
+	reatomPatched,
+	reatomJsx,
+	reatomJsxNative,
+	reatomJsxPatched,
+]
 
 const settle = (server: BenchServer) => server.server.settled()
 

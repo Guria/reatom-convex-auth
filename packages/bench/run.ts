@@ -3,11 +3,14 @@
 // equivalent apps (size/). The Reatom side runs once per Reatom build: the
 // packages installed here (stable) and in packages/reatom-next (next).
 // `--native` instead runs the binding next to packages/reatom-convex-client
-// on the stable build. `--write` saves the report to RESULTS*.md.
+// on the stable build; `--patched` adds convex/react and the binding on the
+// SDK with packages/convex-patched applied. `--write` saves the report to
+// RESULTS*.md.
 import type { Bench } from './main'
 import type { Plugin, PreviewServer } from 'vite'
 
 import react from '@vitejs/plugin-react'
+import { patchedConvex } from 'convex-patched'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -25,6 +28,7 @@ const { values: options } = parseArgs({
 		write: { type: 'boolean', default: false },
 		matched: { type: 'boolean', default: false },
 		native: { type: 'boolean', default: false },
+		patched: { type: 'boolean', default: false },
 		unbatched: { type: 'boolean', default: false },
 	},
 })
@@ -40,15 +44,17 @@ const config = {
 	warmup: integer(options.warmup, 'warmup', 0),
 }
 const workloads = ['per-message', 'coalesced'] as const
-const outputName = options.native
-	? options.unbatched
-		? 'RESULTS_NATIVE_UNBATCHED'
-		: 'RESULTS_NATIVE'
-	: options.matched
-		? 'RESULTS_MATCHED'
-		: 'RESULTS'
-if (options.matched && options.native)
-	throw new Error('--matched and --native are separate comparisons')
+const outputName = options.patched
+	? 'RESULTS_PATCHED'
+	: options.native
+		? options.unbatched
+			? 'RESULTS_NATIVE_UNBATCHED'
+			: 'RESULTS_NATIVE'
+		: options.matched
+			? 'RESULTS_MATCHED'
+			: 'RESULTS'
+if ([options.matched, options.native, options.patched].filter(Boolean).length > 1)
+	throw new Error('--matched, --native and --patched are separate comparisons')
 if (options.unbatched && !options.native) throw new Error('--unbatched requires --native')
 const batchQuerySet = !options.unbatched
 
@@ -131,27 +137,68 @@ function reatomBuild(name: string, dir: string) {
 
 type ReatomBuild = ReturnType<typeof reatomBuild>
 
-const builds = options.native
-	? [reatomBuild('stable', benchDir)]
-	: [
-			options.matched
-				? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
-				: reatomBuild('stable', benchDir),
-			reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
-		]
+/**
+ * Resolves `convex-patched/*` to the patched convex copy. With `everywhere`,
+ * every `convex` import does, for size apps written against `convex/*`.
+ */
+function convexPatchedPlugin(everywhere: boolean): Plugin {
+	const importer = path.join(patchedConvex(), 'package.json')
+	const pattern = everywhere ? /^convex(?:-patched(?=\/))?(\/.*|)$/ : /^convex-patched(\/.*)$/
+	const inCopy = (source: string, id: string | undefined) => {
+		if (id?.includes('/.var/convex-patched/')) return id
+		throw new Error(`convex-patched: ${source} resolved to ${id}`)
+	}
+	return {
+		name: 'convex-patched',
+		enforce: 'pre',
+		async resolveId(source) {
+			const match = pattern.exec(source)
+			if (!match) return
+			const resolved = await this.resolve(`convex${match[1]!}`, importer, { skipSelf: true })
+			return inCopy(source, resolved?.id)
+		},
+	}
+}
+
+const builds =
+	options.native || options.patched
+		? [reatomBuild('stable', benchDir)]
+		: [
+				options.matched
+					? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
+					: reatomBuild('stable', benchDir),
+				reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
+			]
+
+const patchedColumns = () =>
+	[
+		{ label: OFFICIAL, binding: OFFICIAL },
+		{ label: `${OFFICIAL} patched`, binding: `${OFFICIAL} patched` },
+		...['@reatom/react', '@reatom/jsx'].flatMap((binding) => [
+			{ label: `${binding} binding`, binding },
+			{ label: `${binding} binding patched`, binding: `${binding} patched` },
+			{ label: `${binding} native`, binding: `${binding} native` },
+		]),
+	].map((column) => ({ ...column, build: builds[0]! }))
 
 // convex/react loads no Reatom; it runs in the first page.
-const COLUMNS = [
-	{ label: OFFICIAL, binding: OFFICIAL, build: builds[0]! },
-	...['@reatom/react', '@reatom/jsx'].flatMap((binding) =>
-		options.native
-			? [
-					{ label: `${binding} binding`, binding, build: builds[0]! },
-					{ label: `${binding} native`, binding: `${binding} native`, build: builds[0]! },
-				]
-			: builds.map((reatom) => ({ label: `${binding} ${reatom.name}`, binding, build: reatom })),
-	),
-]
+const COLUMNS = options.patched
+	? patchedColumns()
+	: [
+			{ label: OFFICIAL, binding: OFFICIAL, build: builds[0]! },
+			...['@reatom/react', '@reatom/jsx'].flatMap((binding) =>
+				options.native
+					? [
+							{ label: `${binding} binding`, binding, build: builds[0]! },
+							{ label: `${binding} native`, binding: `${binding} native`, build: builds[0]! },
+						]
+					: builds.map((reatom) => ({
+							label: `${binding} ${reatom.name}`,
+							binding,
+							build: reatom,
+						})),
+			),
+		]
 
 const quantile = (sorted: number[], q: number) => {
 	const position = (sorted.length - 1) * q
@@ -171,7 +218,7 @@ async function buildPage(reatom: ReatomBuild) {
 		configFile: false,
 		root: benchDir,
 		logLevel: 'warn',
-		plugins: [react(), reatom.plugin],
+		plugins: [react(), reatom.plugin, convexPatchedPlugin(false)],
 		resolve: {
 			// Production React with <Profiler> callbacks, to count commits.
 			alias: [{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' }],
@@ -326,12 +373,16 @@ function runtimeTables(results: Results) {
 	}
 }
 
-async function bundleSize(entry: string, reatom?: ReatomBuild) {
+async function bundleSize(entry: string, reatom?: ReatomBuild, patched = false) {
 	const output = await build({
 		configFile: false,
 		root: benchDir,
 		logLevel: 'silent',
-		plugins: [react(), ...(reatom ? [reatom.plugin] : [])],
+		plugins: [
+			react(),
+			...(reatom ? [reatom.plugin] : []),
+			...(patched ? [convexPatchedPlugin(true)] : []),
+		],
 		build: {
 			write: false,
 			minify: true,
@@ -355,46 +406,83 @@ async function bundleSize(entry: string, reatom?: ReatomBuild) {
 
 type Size = Awaited<ReturnType<typeof bundleSize>>
 
+type SizeRow = {
+	label: string
+	entry: string
+	reatom?: ReatomBuild
+	patched?: boolean
+	/** Label of the row whose gzip size is the app's baseline. */
+	baseline?: string
+}
+
+const appRows = (reatom: ReatomBuild): SizeRow[] => {
+	const react = `React + Reatom ${reatom.name}`
+	const jsx = `Reatom + @reatom/jsx ${reatom.name}`
+	const app = (label: string, entry: string, baseline: string, patched = false) => ({
+		label: `${label} app ${reatom.name}${patched ? ', patched SDK' : ''}`,
+		entry,
+		reatom,
+		patched,
+		baseline,
+	})
+	return [
+		app('Binding + @reatom/react', 'reatom.tsx', react),
+		app('Binding + @reatom/jsx', 'reatom-jsx.tsx', jsx),
+		...(options.patched
+			? [
+					app('Binding + @reatom/react', 'reatom.tsx', react, true),
+					app('Binding + @reatom/jsx', 'reatom-jsx.tsx', jsx, true),
+				]
+			: []),
+		...(options.native || options.patched
+			? [
+					app('Native + @reatom/react', 'native.tsx', react),
+					app('Native + @reatom/jsx', 'native-jsx.tsx', jsx),
+				]
+			: []),
+	]
+}
+
 async function sizes() {
-	const reatomApps = async (reatom: ReatomBuild) => {
-		const [reactReatom, jsxBaseline, binding, bindingJsx, native, nativeJsx] = await Promise.all([
-			bundleSize('react-reatom.tsx', reatom),
-			bundleSize('reatom-jsx-baseline.tsx', reatom),
-			bundleSize('reatom.tsx', reatom),
-			bundleSize('reatom-jsx.tsx', reatom),
-			options.native ? bundleSize('native.tsx', reatom) : undefined,
-			options.native ? bundleSize('native-jsx.tsx', reatom) : undefined,
-		])
-		return { name: reatom.name, reactReatom, jsxBaseline, binding, bindingJsx, native, nativeJsx }
-	}
-	const [[reactOnly, official], apps] = await Promise.all([
-		Promise.all([bundleSize('react.tsx'), bundleSize('official.tsx')]),
-		Promise.all(builds.map(reatomApps)),
-	])
+	const rows: SizeRow[] = [
+		{ label: 'React', entry: 'react.tsx' },
+		...builds.map((reatom) => ({
+			label: `React + Reatom ${reatom.name}`,
+			entry: 'react-reatom.tsx',
+			reatom,
+		})),
+		...builds.map((reatom) => ({
+			label: `Reatom + @reatom/jsx ${reatom.name}`,
+			entry: 'reatom-jsx-baseline.tsx',
+			reatom,
+		})),
+		{ label: 'convex/react app', entry: 'official.tsx', baseline: 'React' },
+		...(options.patched
+			? [
+					{
+						label: 'convex/react app, patched SDK',
+						entry: 'official.tsx',
+						patched: true,
+						baseline: 'React',
+					},
+				]
+			: []),
+		...builds.flatMap(appRows),
+	]
+	const measured = await Promise.all(
+		rows.map(({ entry, reatom, patched }) => bundleSize(entry, reatom, patched)),
+	)
+	const byLabel = new Map(rows.map(({ label }, index) => [label, measured[index]!]))
 	const kb = (bytes: number) => (bytes / 1024).toFixed(1)
-	const row = (label: string, size: Size, baseline?: Size) =>
-		`| ${label} | ${kb(size.min)} | ${kb(size.gzip)} | ${kb(size.brotli)} | ${baseline ? `+${kb(size.gzip - baseline.gzip)}` : ''} |`
+	const added = (size: Size, baseline: string | undefined) =>
+		baseline ? `+${kb(size.gzip - byLabel.get(baseline)!.gzip)}` : ''
 	return [
 		'| Bundle | min KiB | gzip KiB | brotli KiB | gzip added by Convex |',
 		'|---|---:|---:|---:|---:|',
-		row('React', reactOnly),
-		...apps.map((app) => row(`React + Reatom ${app.name}`, app.reactReatom)),
-		...apps.map((app) => row(`Reatom + @reatom/jsx ${app.name}`, app.jsxBaseline)),
-		row('convex/react app', official, reactOnly),
-		...apps.map((app) =>
-			row(`Binding + @reatom/react app ${app.name}`, app.binding, app.reactReatom),
-		),
-		...apps.map((app) =>
-			row(`Binding + @reatom/jsx app ${app.name}`, app.bindingJsx, app.jsxBaseline),
-		),
-		...apps.flatMap((app) =>
-			app.native && app.nativeJsx
-				? [
-						row(`Native + @reatom/react app ${app.name}`, app.native, app.reactReatom),
-						row(`Native + @reatom/jsx app ${app.name}`, app.nativeJsx, app.jsxBaseline),
-					]
-				: [],
-		),
+		...rows.map(({ label, baseline }, index) => {
+			const size = measured[index]!
+			return `| ${label} | ${kb(size.min)} | ${kb(size.gzip)} | ${kb(size.brotli)} | ${added(size, baseline)} |`
+		}),
 	].join('\n')
 }
 
@@ -426,9 +514,9 @@ const buildList = builds
 			`- ${reatom.name} (${path.relative(path.resolve(benchDir, '../..'), reatom.dir)}): ${reatom.describe().join(', ')}. The page reports \`VERSION\` ${versions.get(reatom)}.`,
 	)
 	.join('\n')
-const report = `# convex/react vs the Reatom binding${options.native ? ' and native client' : ''}
+const report = `# convex/react vs the Reatom binding${options.native || options.patched ? ' and native client' : ''}${options.patched ? ' on the patched SDK' : ''}
 
-Generated by \`mise run bench${options.matched ? ' --matched' : ''}${options.native ? ' --native' : ''}${options.unbatched ? ' --unbatched' : ''} --items ${config.items} --iterations ${config.iterations} --warmup ${config.warmup} --write\` on ${new Date().toISOString().slice(0, 10)}.
+Generated by \`mise run bench${options.matched ? ' --matched' : ''}${options.native ? ' --native' : ''}${options.patched ? ' --patched' : ''}${options.unbatched ? ' --unbatched' : ''} --items ${config.items} --iterations ${config.iterations} --warmup ${config.warmup} --write\` on ${new Date().toISOString().slice(0, 10)}.
 ${os.cpus()[0]?.model ?? 'unknown CPU'}, ${os.platform()} ${os.release()}, Node ${process.version}, Chromium ${browserVersion}.
 ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} components where a scenario mounts many.
 
@@ -443,10 +531,12 @@ rendered by @reatom/react, and the same binding rendered by @reatom/jsx. Each
 Reatom build gets its own page, so a page never loads two Reatom copies;
 convex/react runs in the baseline page. Each run gets a fresh in-process Convex
 server (packages/convex-fake-server), client and container. Every iteration
-runs all five columns ${options.native ? 'in one page' : 'across both pages'}, and the column that goes first
+runs all ${COLUMNS.length} columns ${builds.length === 1 ? 'in one page' : 'across both pages'}, and the column that goes first
 rotates. Workload order also alternates. Times run from the action to the
 DOM change. The completion observer scans the container once, then updates a
 set of matches from changed nodes. It does not rescan 1000 items per update.
+
+${options.patched ? `Columns marked "patched" run convex/react or the binding on convex@1.48.0 with packages/convex-patched applied: query set edits made in one microtask go out as one message, and while no optimistic update is pending a transition updates only the queries it names. The native client batches query set edits too.` : ''}
 
 ${options.native ? `The native client uses \`batchQuerySet: ${batchQuerySet}\`. ${batchQuerySet ? 'It coalesces query-set edits within a microtask. The binding and convex/react send one edit per message.' : 'It sends one edit per message, matching the other clients. This is the control for query-set batching.'}` : ''}
 
@@ -481,7 +571,7 @@ if (options.write) {
 		path.join(benchDir, `${outputName}.json`),
 		JSON.stringify(
 			{
-				config: { ...config, native: options.native, batchQuerySet },
+				config: { ...config, native: options.native, patched: options.patched, batchQuerySet },
 				browserVersion,
 				generated: new Date().toISOString(),
 				builds: builds.map(({ name, describe }) => ({ name, packages: describe() })),
