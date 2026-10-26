@@ -15,8 +15,9 @@ local typecheck = new Step {
   check = "mise run typecheck"
 }
 
+// CRAP scores need coverage; without it fallow falls back to static estimates.
 local fallow = new Step {
-  check = "nub exec fallow --config .config/fallow.toml --fail-on-issues --format json --quiet >/dev/null"
+  check = "mise run test:coverage >/dev/null && nub exec fallow --config .config/fallow.toml --coverage .var/coverage --fail-on-issues --format json --quiet >/dev/null"
 }
 
 local hygieneSteps = new Mapping<String, Step> {
