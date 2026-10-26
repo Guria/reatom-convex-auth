@@ -11,7 +11,8 @@
 		"convex-fake-server": "workspace:*",
 		"react": "^19.2.7",
 		"react-dom": "^19.2.7",
-		"reatom-convex": "workspace:*"
+		"reatom-convex": "workspace:*",
+		"reatom-convex-client": "workspace:*"
 	},
 	"devDependencies": {
 		"@vitejs/plugin-react": "^6.0.5",

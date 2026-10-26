@@ -14,16 +14,20 @@ import {
 	type Handle,
 } from './fixture'
 import { official } from './official'
-import { reatom } from './reatom'
-import { reatomJsx } from './reatomJsx'
+import { reatom, reatomNative } from './reatom'
+import { reatomJsx, reatomJsxNative } from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
 
-type Config = { items: number; queryResponses: 'per-message' | 'coalesced' }
-type Sample = { ms: number; renders: number; commits: number }
+type Config = {
+	items: number
+	queryResponses: 'per-message' | 'coalesced'
+	batchQuerySet: boolean
+}
+type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
-const allBindings = [official, reatom, reatomJsx]
+const allBindings = [official, reatom, reatomNative, reatomJsx, reatomJsxNative]
 
 const settle = (server: BenchServer) => server.server.settled()
 
@@ -32,7 +36,7 @@ async function session<T>(binding: Binding, config: Config, run: (ctx: Context) 
 	// @reatom/jsx observes the container's parent, so it is attached first.
 	const container = document.createElement('div')
 	document.body.append(container)
-	const instance = binding.create(server, container)
+	const instance = binding.create(server, container, { batchQuerySet: config.batchQuerySet })
 	while (!instance.connected()) await settle(server)
 	try {
 		return await run({ server, instance, container })
@@ -67,7 +71,9 @@ const distinctQueries: Scenario = (binding, config) =>
 		const { items } = config
 		const ids = Array.from({ length: items }, (_, index) => index)
 		const all = (v: number) => ({ selector: `[data-v="${v}"]`, count: config.items })
+		const beforeMount = server.server.transitionCount()
 		const mount = await measure(container, () => instance.items(ids), all(0))
+		mount.transitions = server.server.transitionCount() - beforeMount
 		const updateAll = await measure(container, () => server.bump(ids), all(1))
 		const middle = Math.floor(items / 2)
 		const updateOne = await measure(container, () => server.bump([middle]), {

@@ -5,8 +5,8 @@
 // Components run once; bound values update the DOM directly.
 import { mount } from '@reatom/jsx'
 
-import { counters, type Binding, type Note } from './fixture'
-import { reatomModels, type ItemModel } from './reatomModels'
+import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
+import { nativeModels, reatomModels, type ItemModel, type ReatomModels } from './reatomModels'
 
 const Item = ({ id, model }: { id: number; model: ItemModel }) => (
 	<i
@@ -24,11 +24,14 @@ const Notes = ({ notes }: { notes: () => Note[] }) => (
 	<ul>{() => notes().map((note) => <li>{note.text}</li>)}</ul>
 )
 
-export const reatomJsx: Binding = {
-	label: '@reatom/jsx',
+const jsxBinding = (
+	label: string,
+	createModels: (server: BenchServer, options: ModelOptions) => ReatomModels,
+): Binding => ({
+	label,
 	commits: false,
-	create(server, container) {
-		const models = reatomModels(server)
+	create(server, container, options) {
+		const models = createModels(server, options)
 		let unmount: (() => void) | undefined
 		const show = (build: () => Element) =>
 			models.frame.run(() => {
@@ -64,8 +67,11 @@ export const reatomJsx: Binding = {
 			clear,
 			close: () => {
 				clear()
-				return models.client.close()
+				return models.close()
 			},
 		}
 	},
-}
+})
+
+export const reatomJsx = jsxBinding('@reatom/jsx', reatomModels)
+export const reatomJsxNative = jsxBinding('@reatom/jsx native', nativeModels)

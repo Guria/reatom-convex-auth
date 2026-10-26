@@ -2,7 +2,8 @@
 // Chromium on production builds (main.tsx), and minified bundle sizes of
 // equivalent apps (size/). The Reatom side runs once per Reatom build: the
 // packages installed here (stable) and in packages/reatom-next (next).
-// `--write` saves the report to RESULTS.md.
+// `--native` instead runs the binding next to packages/reatom-convex-client
+// on the stable build. `--write` saves the report to RESULTS*.md.
 import type { Bench } from './main'
 import type { Plugin, PreviewServer } from 'vite'
 
@@ -23,6 +24,8 @@ const { values: options } = parseArgs({
 		warmup: { type: 'string', default: '3' },
 		write: { type: 'boolean', default: false },
 		matched: { type: 'boolean', default: false },
+		native: { type: 'boolean', default: false },
+		unbatched: { type: 'boolean', default: false },
 	},
 })
 const integer = (value: string, name: string, minimum = 1) => {
@@ -37,7 +40,17 @@ const config = {
 	warmup: integer(options.warmup, 'warmup', 0),
 }
 const workloads = ['per-message', 'coalesced'] as const
-const outputName = options.matched ? 'RESULTS_MATCHED' : 'RESULTS'
+const outputName = options.native
+	? options.unbatched
+		? 'RESULTS_NATIVE_UNBATCHED'
+		: 'RESULTS_NATIVE'
+	: options.matched
+		? 'RESULTS_MATCHED'
+		: 'RESULTS'
+if (options.matched && options.native)
+	throw new Error('--matched and --native are separate comparisons')
+if (options.unbatched && !options.native) throw new Error('--unbatched requires --native')
+const batchQuerySet = !options.unbatched
 
 const benchDir = import.meta.dirname
 const outDir = path.resolve(benchDir, '../../.var/bench/runtime')
@@ -47,7 +60,7 @@ const JSX_RUNTIME = '@reatom/jsx/jsx-runtime'
 // Stands in for a jsx-runtime entry that exports only `h`/`hf`.
 const jsxRuntimeAdapter = path.join(benchDir, 'reatomJsxRuntime.ts')
 
-type Sample = { ms: number; renders: number; commits: number }
+type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 type Results = Record<string, Record<string, Sample[]>>
 
 const readPackage = (dir: string) =>
@@ -118,18 +131,25 @@ function reatomBuild(name: string, dir: string) {
 
 type ReatomBuild = ReturnType<typeof reatomBuild>
 
-const builds = [
-	options.matched
-		? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
-		: reatomBuild('stable', benchDir),
-	reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
-]
+const builds = options.native
+	? [reatomBuild('stable', benchDir)]
+	: [
+			options.matched
+				? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
+				: reatomBuild('stable', benchDir),
+			reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
+		]
 
-// convex/react loads no Reatom; it runs in the stable page.
+// convex/react loads no Reatom; it runs in the first page.
 const COLUMNS = [
 	{ label: OFFICIAL, binding: OFFICIAL, build: builds[0]! },
 	...['@reatom/react', '@reatom/jsx'].flatMap((binding) =>
-		builds.map((reatom) => ({ label: `${binding} ${reatom.name}`, binding, build: reatom })),
+		options.native
+			? [
+					{ label: `${binding} binding`, binding, build: builds[0]! },
+					{ label: `${binding} native`, binding: `${binding} native`, build: builds[0]! },
+				]
+			: builds.map((reatom) => ({ label: `${binding} ${reatom.name}`, binding, build: reatom })),
 	),
 ]
 
@@ -139,9 +159,10 @@ const quantile = (sorted: number[], q: number) => {
 	const upper = Math.ceil(position)
 	return sorted[lower]! + (sorted[upper]! - sorted[lower]!) * (position - lower)
 }
-const sortedBy = (samples: Sample[], key: keyof Sample) =>
+const sortedBy = (samples: Sample[], key: 'ms' | 'renders' | 'commits') =>
 	samples.map((sample) => sample[key]).sort((a, b) => a - b)
-const median = (samples: Sample[], key: keyof Sample) => quantile(sortedBy(samples, key), 0.5)
+const median = (samples: Sample[], key: 'ms' | 'renders' | 'commits') =>
+	quantile(sortedBy(samples, key), 0.5)
 const ms = (value: number) => (value < 10 ? value.toFixed(2) : value.toFixed(1))
 
 async function buildPage(reatom: ReatomBuild) {
@@ -222,8 +243,9 @@ async function iteration(
 					(window as unknown as { bench: Bench }).bench.run(input.binding, input.scenario, {
 						items: input.items,
 						queryResponses: input.queryResponses,
+						batchQuerySet: input.batchQuerySet,
 					}),
-				{ binding, scenario, items: config.items, queryResponses },
+				{ binding, scenario, items: config.items, queryResponses, batchQuerySet },
 			)
 			if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`)
 			samples.push({ label, byName })
@@ -290,6 +312,14 @@ function runtimeTables(results: Results) {
 			const sorted = sortedBy(samples, 'ms')
 			return `${ms(quantile(sorted, 0.25))}–${ms(quantile(sorted, 0.75))}`
 		}),
+		transitions: labels
+			.map((label) => {
+				const counts = results['mount']![label]!.map((sample) => sample.transitions ?? 0).sort(
+					(a, b) => a - b,
+				)
+				return `${label}: ${quantile(counts, 0.5)}`
+			})
+			.join('; '),
 		counts: table(
 			(samples) => `${count(median(samples, 'renders'))} / ${count(median(samples, 'commits'))}`,
 		),
@@ -327,13 +357,15 @@ type Size = Awaited<ReturnType<typeof bundleSize>>
 
 async function sizes() {
 	const reatomApps = async (reatom: ReatomBuild) => {
-		const [reactReatom, jsxBaseline, binding, bindingJsx] = await Promise.all([
+		const [reactReatom, jsxBaseline, binding, bindingJsx, native, nativeJsx] = await Promise.all([
 			bundleSize('react-reatom.tsx', reatom),
 			bundleSize('reatom-jsx-baseline.tsx', reatom),
 			bundleSize('reatom.tsx', reatom),
 			bundleSize('reatom-jsx.tsx', reatom),
+			options.native ? bundleSize('native.tsx', reatom) : undefined,
+			options.native ? bundleSize('native-jsx.tsx', reatom) : undefined,
 		])
-		return { name: reatom.name, reactReatom, jsxBaseline, binding, bindingJsx }
+		return { name: reatom.name, reactReatom, jsxBaseline, binding, bindingJsx, native, nativeJsx }
 	}
 	const [[reactOnly, official], apps] = await Promise.all([
 		Promise.all([bundleSize('react.tsx'), bundleSize('official.tsx')]),
@@ -355,6 +387,14 @@ async function sizes() {
 		...apps.map((app) =>
 			row(`Binding + @reatom/jsx app ${app.name}`, app.bindingJsx, app.jsxBaseline),
 		),
+		...apps.flatMap((app) =>
+			app.native && app.nativeJsx
+				? [
+						row(`Native + @reatom/react app ${app.name}`, app.native, app.reactReatom),
+						row(`Native + @reatom/jsx app ${app.name}`, app.nativeJsx, app.jsxBaseline),
+					]
+				: [],
+		),
 	].join('\n')
 }
 
@@ -374,7 +414,9 @@ ${tables.spread}
 
 Item renders / React commits, medians. JSX counts bound-value recomputes:
 
-${tables.counts}`
+${tables.counts}
+
+Query-set transitions during mount, medians: ${tables.transitions}.`
 	})
 	.join('\n\n')
 const sizeTable = await sizes()
@@ -384,9 +426,9 @@ const buildList = builds
 			`- ${reatom.name} (${path.relative(path.resolve(benchDir, '../..'), reatom.dir)}): ${reatom.describe().join(', ')}. The page reports \`VERSION\` ${versions.get(reatom)}.`,
 	)
 	.join('\n')
-const report = `# convex/react vs the Reatom binding
+const report = `# convex/react vs the Reatom binding${options.native ? ' and native client' : ''}
 
-Generated by \`mise run bench${options.matched ? ' --matched' : ''}\` on ${new Date().toISOString().slice(0, 10)}.
+Generated by \`mise run bench${options.matched ? ' --matched' : ''}${options.native ? ' --native' : ''}${options.unbatched ? ' --unbatched' : ''} --items ${config.items} --iterations ${config.iterations} --warmup ${config.warmup} --write\` on ${new Date().toISOString().slice(0, 10)}.
 ${os.cpus()[0]?.model ?? 'unknown CPU'}, ${os.platform()} ${os.release()}, Node ${process.version}, Chromium ${browserVersion}.
 ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} components where a scenario mounts many.
 
@@ -401,10 +443,12 @@ rendered by @reatom/react, and the same binding rendered by @reatom/jsx. Each
 Reatom build gets its own page, so a page never loads two Reatom copies;
 convex/react runs in the baseline page. Each run gets a fresh in-process Convex
 server (packages/convex-fake-server), client and container. Every iteration
-runs all five columns across both pages, and the column that goes first
+runs all five columns ${options.native ? 'in one page' : 'across both pages'}, and the column that goes first
 rotates. Workload order also alternates. Times run from the action to the
 DOM change. The completion observer scans the container once, then updates a
 set of matches from changed nodes. It does not rescan 1000 items per update.
+
+${options.native ? `The native client uses \`batchQuerySet: ${batchQuerySet}\`. ${batchQuerySet ? 'It coalesces query-set edits within a microtask. The binding and convex/react send one edit per message.' : 'It sends one edit per message, matching the other clients. This is the control for query-set batching.'}` : ''}
 
 The stress case sends one response for each query-set message. The coalesced
 case waits until the currently queued query-set burst has been processed and
@@ -437,7 +481,7 @@ if (options.write) {
 		path.join(benchDir, `${outputName}.json`),
 		JSON.stringify(
 			{
-				config,
+				config: { ...config, native: options.native, batchQuerySet },
 				browserVersion,
 				generated: new Date().toISOString(),
 				builds: builds.map(({ name, describe }) => ({ name, packages: describe() })),

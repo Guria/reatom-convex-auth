@@ -1,6 +1,8 @@
 # Benchmark: convex/react vs the Reatom binding
 
 ```bash
+mise run bench --native --write            # binding vs native, same Reatom build
+mise run bench --native --unbatched --write # control: one query-set edit per message
 mise run bench                    # stable release vs next, print the report
 mise run bench --write            # save RESULTS.md and raw samples in RESULTS.json
 mise run bench --matched --write  # base vs next, as RESULTS_MATCHED.md/.json
@@ -8,6 +10,26 @@ mise run bench --matched --write  # base vs next, as RESULTS_MATCHED.md/.json
 
 [RESULTS.md](RESULTS.md) and [RESULTS_MATCHED.md](RESULTS_MATCHED.md) hold the
 latest numbers. This page explains them.
+
+## Native client comparison
+
+`--native` uses only the stable Reatom build. Its five columns are
+convex/react, binding/react, native/react, binding/jsx and native/jsx, in the
+same page. [RESULTS_NATIVE.md](RESULTS_NATIVE.md) and
+[RESULTS_NATIVE_UNBATCHED.md](RESULTS_NATIVE_UNBATCHED.md) include raw sample
+companions as JSON. Both response shapes run in each comparison.
+
+Native batching is on by default. Its 1000 distinct subscriptions can use
+one query-set message where the SDK clients use 1000. `--unbatched` disables
+that optimization; the runner records mount transition counts to make the
+message-volume difference explicit. The unbatched run still uses the native
+atom graph and its synchronous lifecycle hooks.
+
+The size apps share their models and renderer within each adapter, with only
+the client factory changed. This avoids comparing a smaller native feature
+set with a larger binding fixture. The native package's
+[report](../reatom-convex-client/README.md) lists the actual missing protocol
+and SDK features; equal fixture size does not imply full SDK parity.
 
 ## How it runs
 
