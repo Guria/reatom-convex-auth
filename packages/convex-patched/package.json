@@ -1,0 +1,21 @@
+{
+	"name": "convex-patched",
+	"version": "0.0.0",
+	"private": true,
+	"description": "convex@1.48.0 with batched query set edits and per-query transitions",
+	"type": "module",
+	"exports": {
+		".": "./src/patchedConvex.ts",
+		"./browser": {
+			"types": "./src/browser.d.ts"
+		},
+		"./react": {
+			"types": "./src/react.d.ts"
+		}
+	},
+	"devDependencies": {
+		"convex": "1.48.0",
+		"convex-fake-server": "workspace:*",
+		"vite-plus": "^0.2.8"
+	}
+}

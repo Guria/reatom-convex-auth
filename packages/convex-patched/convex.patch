@@ -1,0 +1,207 @@
+--- a/dist/esm/browser/sync/client.js
++++ b/dist/esm/browser/sync/client.js
+@@ -47,6 +47,12 @@
+     __publicField(this, "_transitionHandlerCounter", 0);
+     __publicField(this, "_nextRequestId");
+     __publicField(this, "_onTransitionFns", /* @__PURE__ */ new Map());
++    // Query set edits made in one microtask, merged into one ModifyQuerySet.
++    __publicField(this, "pendingQuerySetModification", null);
++    // Unsubscribed tokens whose cached results go on the next transition.
++    __publicField(this, "removedQueryTokens", /* @__PURE__ */ new Set());
++    // A reconnect replaced the remote query set; rebuild all results once.
++    __publicField(this, "fullIngestPending", false);
+     __publicField(this, "_sessionId");
+     __publicField(this, "firstMessageReceived", false);
+     __publicField(this, "debug");
+@@ -121,6 +127,7 @@
+       this.markConnectionStateDirty
+     );
+     const pauseSocket = () => {
++      this.flushQuerySet();
+       this.webSocketManager.pause();
+       this.state.pause();
+     };
+@@ -184,6 +191,8 @@
+             (queryId) => this.state.queryPath(queryId),
+             this.logger
+           );
++          this.pendingQuerySetModification = null;
++          this.fullIngestPending = true;
+           const [querySetModification, authModification] = this.state.restart();
+           if (authModification) {
+             this.webSocketManager.sendMessage(authModification);
+@@ -220,7 +229,7 @@
+               const completedRequests = this.requestManager.removeCompleted(
+                 this.remoteQuerySet.timestamp()
+               );
+-              this.notifyOnQueryResultChanges(completedRequests);
++              this.notifyOnQueryResultChanges(completedRequests, serverMessage);
+               break;
+             }
+             case "MutationResponse": {
+@@ -298,24 +307,9 @@
+    * @param completedMutations - A set of mutation IDs whose optimistic updates
+    * are no longer needed.
+    */
+-  notifyOnQueryResultChanges(completedRequests) {
+-    const remoteQueryResults = this.remoteQuerySet.remoteQueryResults();
+-    const queryTokenToValue = /* @__PURE__ */ new Map();
+-    for (const [queryId, result] of remoteQueryResults) {
+-      const queryToken = this.state.queryToken(queryId);
+-      if (queryToken !== null) {
+-        const query = {
+-          result,
+-          udfPath: this.state.queryPath(queryId),
+-          args: this.state.queryArgs(queryId)
+-        };
+-        queryTokenToValue.set(queryToken, query);
+-      }
+-    }
+-    const changedQueryTokens = this.optimisticQueryResults.ingestQueryResultsFromServer(
+-      queryTokenToValue,
+-      new Set(completedRequests.keys())
+-    );
++  notifyOnQueryResultChanges(completedRequests, transition) {
++    const incremental = !this.fullIngestPending && !this.optimisticQueryResults.hasOptimisticUpdates();
++    const changedQueryTokens = !incremental ? this.ingestAllQueryResults(completedRequests) : transition === void 0 ? [] : this.ingestTransition(transition);
+     this.handleTransition({
+       queries: changedQueryTokens.map((token) => {
+         const optimisticResult = this.optimisticQueryResults.rawQueryResult(token);
+@@ -336,6 +330,56 @@
+       timestamp: this.remoteQuerySet.timestamp()
+     });
+   }
++  /**
++   * Without optimistic updates to replay, a transition changes only the
++   * queries it names, plus the ones unsubscribed since the last transition,
++   * and a mutation response changes nothing.
++   */
++  ingestTransition(transition) {
++    const remoteQueryResults = this.remoteQuerySet.remoteQueryResults();
++    const changes = /* @__PURE__ */ new Map();
++    for (const queryToken of this.removedQueryTokens) {
++      changes.set(queryToken, void 0);
++    }
++    this.removedQueryTokens.clear();
++    for (const modification of transition.modifications) {
++      const queryToken = this.state.queryToken(modification.queryId);
++      if (queryToken === null) continue;
++      const result = remoteQueryResults.get(modification.queryId);
++      changes.set(
++        queryToken,
++        result === void 0 ? void 0 : {
++          result,
++          udfPath: this.state.queryPath(modification.queryId),
++          args: this.state.queryArgs(modification.queryId)
++        }
++      );
++    }
++    return this.optimisticQueryResults.ingestChangedQueryResultsFromServer(
++      changes
++    );
++  }
++  ingestAllQueryResults(completedRequests) {
++    this.fullIngestPending = false;
++    this.removedQueryTokens.clear();
++    const remoteQueryResults = this.remoteQuerySet.remoteQueryResults();
++    const queryTokenToValue = /* @__PURE__ */ new Map();
++    for (const [queryId, result] of remoteQueryResults) {
++      const queryToken = this.state.queryToken(queryId);
++      if (queryToken !== null) {
++        const query = {
++          result,
++          udfPath: this.state.queryPath(queryId),
++          args: this.state.queryArgs(queryId)
++        };
++        queryTokenToValue.set(queryToken, query);
++      }
++    }
++    return this.optimisticQueryResults.ingestQueryResultsFromServer(
++      queryTokenToValue,
++      new Set(completedRequests.keys())
++    );
++  }
+   handleTransition(transition) {
+     for (const fn of this._onTransitionFns.values()) {
+       fn(transition);
+@@ -423,17 +467,47 @@
+       options?.componentPath
+     );
+     if (modification !== null) {
+-      this.webSocketManager.sendMessage(modification);
++      this.queueQuerySetModification(modification);
+     }
+     return {
+       queryToken,
+       unsubscribe: () => {
+         const modification2 = unsubscribe();
+         if (modification2) {
+-          this.webSocketManager.sendMessage(modification2);
++          this.removedQueryTokens.add(queryToken);
++          this.queueQuerySetModification(modification2);
+         }
+       }
+     };
++  }
++  /**
++   * Edits made in one microtask go out as one ModifyQuerySet. Their versions
++   * are consecutive, so the merged message spans the first base version to
++   * the last new version. While paused, `LocalSyncState` holds the edits for
++   * `resume()` instead.
++   */
++  queueQuerySetModification(modification) {
++    if (this.state.paused) {
++      this.webSocketManager.sendMessage(modification);
++      return;
++    }
++    const pending = this.pendingQuerySetModification;
++    if (pending !== null) {
++      pending.newVersion = modification.newVersion;
++      pending.modifications.push(...modification.modifications);
++      return;
++    }
++    this.pendingQuerySetModification = {
++      ...modification,
++      modifications: [...modification.modifications]
++    };
++    queueMicrotask(() => this.flushQuerySet());
++  }
++  flushQuerySet() {
++    const pending = this.pendingQuerySetModification;
++    if (pending === null) return;
++    this.pendingQuerySetModification = null;
++    this.webSocketManager.sendMessage(pending);
+   }
+   /**
+    * A query result based only on the current, local state.
+--- a/dist/esm/browser/sync/optimistic_updates_impl.js
++++ b/dist/esm/browser/sync/optimistic_updates_impl.js
+@@ -107,6 +107,28 @@
+     }
+     return changedQueries;
+   }
++  hasOptimisticUpdates() {
++    return this.optimisticUpdates.length > 0;
++  }
++  /**
++   * Replace the results of the given queries, `undefined` removing one.
++   * Only valid while no optimistic update is pending.
++   */
++  ingestChangedQueryResultsFromServer(changes) {
++    const changedQueries = [];
++    for (const [queryToken, query] of changes) {
++      if (query === void 0) {
++        this.queryResults.delete(queryToken);
++        continue;
++      }
++      const oldQuery = this.queryResults.get(queryToken);
++      this.queryResults.set(queryToken, query);
++      if (oldQuery === void 0 || oldQuery.result !== query.result) {
++        changedQueries.push(queryToken);
++      }
++    }
++    return changedQueries;
++  }
+   applyOptimisticUpdate(update, mutationId) {
+     this.optimisticUpdates.push({
+       update,

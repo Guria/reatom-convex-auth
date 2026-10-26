@@ -5,6 +5,7 @@
 		{ "path": "./tsconfig.node.json" },
 		{ "path": "./packages/bench" },
 		{ "path": "./packages/convex-fake-server" },
+		{ "path": "./packages/convex-patched" },
 		{ "path": "./packages/reatom-convex" },
 		{ "path": "./packages/reatom-convex-client" }
 	],

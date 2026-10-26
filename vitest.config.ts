@@ -42,6 +42,7 @@ export default defineConfig({
 				'packages/reatom-convex/src/**/*.ts',
 				'packages/reatom-convex-client/src/**/*.ts',
 				'packages/convex-fake-server/src/**/*.ts',
+				'packages/convex-patched/src/**/*.ts',
 				'convex/notes.ts',
 				'convex/viewer.ts',
 			],

@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"types": ["node"],
+		"composite": true,
+		"tsBuildInfoFile": "../../.var/local/ts/convex-patched.tsbuildinfo"
+	},
+	"include": ["src"]
+}
