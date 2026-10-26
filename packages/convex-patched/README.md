@@ -23,6 +23,10 @@ The SDK sends one `ModifyQuerySet` per subscription and rebuilds and diffs its
 whole result map on every transition, so mounting N queries against a server
 that answers each message costs O(N²).
 
+In [the benchmark](../bench/RESULTS_PATCHED.md), mounting 1000 queries
+against that server takes convex/react from 59.2 to 9.99 ms and the binding
+under @reatom/jsx from 67.3 to 13.9 ms. The patch adds 0.4 KiB gzip.
+
 ```ts
 import { patchedConvex, patchedConvexFile } from 'convex-patched'
 

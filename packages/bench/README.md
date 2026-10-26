@@ -3,6 +3,7 @@
 ```bash
 mise run bench --native --write            # binding vs native, same Reatom build
 mise run bench --native --unbatched --write # control: one query-set edit per message
+mise run bench --patched --write           # also convex/react and the binding on the patched SDK
 mise run bench                    # stable release vs next, print the report
 mise run bench --write            # save RESULTS.md and raw samples in RESULTS.json
 mise run bench --matched --write  # base vs next, as RESULTS_MATCHED.md/.json
@@ -24,6 +25,13 @@ one query-set message where the SDK clients use 1000. `--unbatched` disables
 that optimization; the runner records mount transition counts to make the
 message-volume difference explicit. The unbatched run still uses the native
 atom graph and its synchronous lifecycle hooks.
+
+`--patched` adds three columns: convex/react and the binding under both
+renderers on [`packages/convex-patched`](../convex-patched/README.md), next
+to the stock and native columns, in [RESULTS_PATCHED.md](RESULTS_PATCHED.md).
+A Vite plugin resolves `convex-patched/browser` and `convex-patched/react`
+to the patched copy; the binding itself stays the same module and receives
+the patched `ConvexClient`.
 
 The size apps share their models and renderer within each adapter, with only
 the client factory changed. This avoids comparing a smaller native feature

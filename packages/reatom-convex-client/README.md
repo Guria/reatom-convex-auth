@@ -150,22 +150,43 @@ Where it doesn't:
   1200 lines of tests, all tracking a protocol Convex doesn't publish as
   stable.
 
+## The SDK with both changes
+
+[`packages/convex-patched`](../convex-patched/README.md) puts the two
+changes into `BaseConvexClient`: query set edits batched per microtask, and
+transitions applied to the queries they name while no optimistic update is
+pending. From [RESULTS_PATCHED.md](../bench/RESULTS_PATCHED.md), all eight
+columns in one page, medians in ms:
+
+| Scenario, per-message | convex/react | convex/react, patched | binding, JSX | binding, JSX, patched | native, JSX |
+| --------------------- | -----------: | --------------------: | -----------: | --------------------: | ----------: |
+| mount                 |         59.2 |                  9.99 |         67.3 |                  13.9 |        11.9 |
+| unmount               |         8.82 |                  1.44 |         10.4 |                  2.90 |        1.37 |
+| update all            |         3.66 |                  3.81 |         3.69 |                  2.94 |        2.25 |
+| coalesced mount       |         14.1 |                  9.61 |         16.9 |                  14.2 |        12.1 |
+
+Under @reatom/react the patched binding mounts in 23.7 ms against 22.8 for
+native. The patch adds 0.4 KiB gzip to each app.
+
+convex/react on the patched SDK is the fastest column at mounting and
+unmounting 1000 queries, with or without Reatom. The binding on the
+patched SDK is 2 ms behind native on mount and 1.5 ms on unmount under
+@reatom/jsx. Both send the same 2 transitions on mount, so the rest sits in
+the client code above the protocol; this run doesn't profile where. Native
+keeps its 8 KiB bundle advantage.
+
 ## Verdict
 
-Not worth pursuing as a replacement for the binding. The measurable gains come
-from two changes: batching query set edits per microtask, and applying a
-transition to the queries it names instead of rebuilding the result map. Both
-fit inside `BaseConvexClient`, and both pay off only when hundreds of
-subscriptions start or stop at once. Everything else either matches the
-binding or depends on the view layer. In exchange the app owns reconnect, auth
-races and pagination splits that the SDK ships with each Convex release. The
-real-backend smoke test already caught one pagination bug the fake server had
-missed: loaded cursors survived a user switch.
+Not worth pursuing as a replacement for the binding. The patched SDK gets
+convex/react to 0.17× of its stock mount time and the binding to within
+2 ms of native, by changing two methods of `BaseConvexClient`. Native's
+remaining edge is 8 KiB of bundle and a couple of milliseconds per 1000
+subscriptions. In exchange the app would own reconnect, auth races and
+pagination splits that the SDK ships with each Convex release. The
+real-backend smoke test already caught one pagination bug the fake server
+had missed: loaded cursors survived a user switch.
 
-It would earn its keep for an app on @reatom/jsx that mounts large query sets
-and counts kilobytes: there per-message mount is 0.19× convex/react and the
-bundle is 8 KiB smaller. The cheaper path is to propose the two changes to `convex/browser`
-and keep the binding.
+Propose `convex.patch` upstream and keep the binding.
 
 ## Reproduce
 
@@ -174,6 +195,7 @@ nub install
 mise run validate
 mise run bench --native --write
 mise run bench --native --unbatched --write
+mise run bench --patched --write
 ```
 
 Against a local anonymous deployment, each in its own terminal:
