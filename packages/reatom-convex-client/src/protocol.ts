@@ -121,7 +121,7 @@ export type TransitionChunk = {
 
 export type WireMessage = ServerMessage | TransitionChunk | { type: 'Ping' }
 
-export const decodeTs = (encoded: string): bigint => {
+const decodeTs = (encoded: string): bigint => {
 	const bytes = atob(encoded)
 	let value = 0n
 	for (let index = bytes.length - 1; index >= 0; index--) {

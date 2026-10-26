@@ -12,7 +12,7 @@ import {
 	type TransitionChunk,
 } from './protocol'
 
-export type SocketState =
+type SocketState =
 	| { state: 'disconnected' }
 	| { state: 'connecting'; paused: 'yes' | 'no' }
 	| { state: 'ready'; paused: 'yes' | 'no' | 'uninitialized' }
@@ -88,6 +88,8 @@ export const reatomConvexSocket = (
 	name: string,
 ) => {
 	const state = atom<SocketState>({ state: 'disconnected' }, `${name}.state`)
+	// Auth may pause during backoff, before there is a socket to pause.
+	const pauseRequested = atom(false, `${name}.pauseRequested`)
 	const connectionCount = atom(0, `${name}.connectionCount`)
 	/** Consecutive failed connections; reset once the client syncs past a reconnect. */
 	const retries = atom(0, `${name}.retries`)
@@ -222,7 +224,7 @@ export const reatomConvexSocket = (
 		}
 		const ws = new webSocketConstructor(uri)
 		rt.ws = ws
-		state.set({ state: 'connecting', paused: 'no' })
+		state.set({ state: 'connecting', paused: pauseRequested() ? 'yes' : 'no' })
 		// Started before onopen, so a failed handshake times out too.
 		resetInactivity()
 		ws.onopen = inRoot(open)
@@ -339,6 +341,11 @@ export const reatomConvexSocket = (
 		/** Closes the socket until `tryRestart`. */
 		stop(): Promise<void> {
 			if (state().state === 'terminated') return Promise.resolve()
+			const rt = peek(runtime)
+			if (rt.inactivity !== null) clearTimeout(rt.inactivity)
+			if (rt.reconnect) clearTimeout(rt.reconnect.timeout)
+			rt.inactivity = null
+			rt.reconnect = null
 			unlistenOnline()
 			const result = close()
 			state.set({ state: 'stopped' })
@@ -350,12 +357,14 @@ export const reatomConvexSocket = (
 			connect()
 		},
 		pause() {
+			pauseRequested.set(true)
 			const current = state()
 			if (current.state === 'connecting' || current.state === 'ready') {
 				state.set({ ...current, paused: 'yes' })
 			}
 		},
 		resume() {
+			pauseRequested.set(false)
 			const current = state()
 			if (current.state === 'connecting') {
 				state.set({ state: 'connecting', paused: 'no' })
@@ -386,5 +395,3 @@ export const reatomConvexSocket = (
 		},
 	}
 }
-
-export type ConvexSocket = ReturnType<typeof reatomConvexSocket>

@@ -263,3 +263,151 @@ test('stops resending a token the server keeps rejecting', async () => {
 	expect(client.auth().state).toBe('noAuth')
 	await client.close()
 })
+
+test('stopping during backoff cancels the scheduled reconnect', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+	const client = create({ logger: false })
+	const unsubscribe = client.connectionState.subscribe(() => {})
+	await Promise.resolve()
+	latest().open()
+	latest().onclose?.({ code: 1006, reason: 'network lost' })
+	await client.socket.stop()
+	vi.advanceTimersByTime(120_000)
+	expect(ScriptedSocket.instances).toHaveLength(1)
+	expect(client.socket.state().state).toBe('stopped')
+	client.socket.tryRestart()
+	expect(ScriptedSocket.instances).toHaveLength(2)
+	latest().open()
+	unsubscribe()
+	const closed = client.close()
+	await vi.runAllTimersAsync()
+	await closed
+})
+
+test('holds a successful mutation and its overlay until the confirming timestamp', async () => {
+	const client = create({ logger: false })
+	const entry = client.query('test:count', {})
+	const unsubscribe = entry.result.subscribe(() => {})
+	await Promise.resolve()
+	latest().open()
+	const transition = (start: number, end: number, value: number) =>
+		latest().receive({
+			type: 'Transition',
+			startVersion: version(start === 0 ? 0 : 1, start),
+			endVersion: version(1, end),
+			modifications: [
+				{
+					type: 'QueryUpdated',
+					queryId: 0,
+					value,
+					logLines: [],
+					journal: 'journal',
+				},
+			],
+		})
+	transition(0, 1, 0)
+	const { makeFunctionReference } = await import('convex/server')
+	const count = makeFunctionReference<'query', Record<string, never>, number>('test:count')
+	let resolved = false
+	const result = client
+		.mutation(
+			'test:add',
+			{},
+			{
+				optimisticUpdate: (store) => store.setQuery(count, {}, 100),
+			},
+		)
+		.then((value) => {
+			resolved = true
+			return value
+		})
+	latest().receive({
+		type: 'MutationResponse',
+		requestId: 0,
+		success: true,
+		result: 'id',
+		ts: encodeTs(10n),
+		logLines: [],
+	})
+	transition(1, 5, 1)
+	await Promise.resolve()
+	expect(resolved).toBe(false)
+	expect(entry.result()).toEqual({ status: 'success', data: 100 })
+	expect(client.optimisticUpdates()).toHaveLength(1)
+	transition(5, 10, 2)
+	await expect(result).resolves.toBe('id')
+	expect(entry.result()).toEqual({ status: 'success', data: 2 })
+	expect(client.optimisticUpdates()).toHaveLength(0)
+	// A duplicate response after reconnect has no effect.
+	latest().receive({
+		type: 'MutationResponse',
+		requestId: 0,
+		success: true,
+		result: 'id',
+		ts: encodeTs(10n),
+		logLines: [],
+	})
+	unsubscribe()
+	await client.close()
+})
+
+test('refreshes a cached token before expiry and cancels the timer on clear', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+	const client = create({ logger: false, initialAuthTokenReuse: true })
+	let issued = 0
+	const now = Math.floor(Date.now() / 1000)
+	const token = () => `e30.${btoa(JSON.stringify({ iat: now, exp: now + 60, n: ++issued }))}.sig`
+	const fetcher = vi.fn(async () => token())
+	const onChange = vi.fn()
+	client.setAuth(fetcher, onChange)
+	await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+	latest().open()
+	await vi.waitFor(() =>
+		expect(latest().sent.some(({ type }) => type === 'Authenticate')).toBe(true),
+	)
+	latest().receive({
+		type: 'Transition',
+		startVersion: version(0, 0),
+		endVersion: version(1, 1, 1),
+		modifications: [],
+		clientClockSkew: 0,
+	})
+	expect(onChange).toHaveBeenCalledWith(true)
+	vi.advanceTimersByTime(48_000)
+	expect(fetcher).toHaveBeenCalledTimes(1)
+	vi.advanceTimersByTime(2000)
+	await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+	expect(fetcher).toHaveBeenLastCalledWith({ forceRefreshToken: true })
+	latest().receive({
+		type: 'Transition',
+		startVersion: version(1, 1, 1),
+		endVersion: version(1, 2, 2),
+		modifications: [],
+	})
+	expect(client.auth().state).toBe('waitingForScheduledRefetch')
+	client.clearAuth()
+	// The socket stays active, but no token fetch survives clearAuth.
+	vi.advanceTimersByTime(51_000)
+	expect(fetcher).toHaveBeenCalledTimes(2)
+	const closed = client.close()
+	await vi.runAllTimersAsync()
+	await closed
+})
+
+test('keeps expectAuth paused across a failed connection', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+	const client = create({ logger: false, expectAuth: true })
+	const unsubscribe = client.query('test:echo').result.subscribe(() => {})
+	await Promise.resolve()
+	latest().onclose?.({ code: 1006, reason: 'network lost' })
+	vi.advanceTimersByTime(1600)
+	expect(ScriptedSocket.instances).toHaveLength(2)
+	latest().open()
+	expect(latest().sent).toHaveLength(0)
+	client.clearAuth()
+	expect(latest().sent.map(({ type }) => type)).toEqual(['Connect', 'ModifyQuerySet'])
+	unsubscribe()
+	const closed = client.close()
+	await vi.runAllTimersAsync()
+	await closed
+})

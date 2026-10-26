@@ -16,7 +16,7 @@ type AuthConfig = {
  * accepts it, then refetch before each token expires. With
  * `initialAuthTokenReuse` the cached token is kept and its refetch scheduled.
  */
-export type AuthState =
+type AuthState =
 	| { state: 'noAuth' }
 	| { state: 'waitingForServerConfirmationOfCachedToken'; config: AuthConfig }
 	| { state: 'initialRefetch'; config: AuthConfig }
@@ -72,10 +72,17 @@ export const reatomConvexAuth = (
 	const { logger } = options
 	const state = atom<AuthState>({ state: 'noAuth' }, `${name}.state`)
 	const runtime = atom(
-		(): { root: Frame; configVersion: number; lastRefreshChange: boolean; attempts: number } => ({
+		(): {
+			root: Frame
+			configVersion: number
+			configEpoch: number
+			lastRefreshChange: boolean
+			attempts: number
+		} => ({
 			root: context(),
 			// Detects `setConfig` and `stop` while a token is being fetched.
 			configVersion: 0,
+			configEpoch: 0,
 			lastRefreshChange: false,
 			// Attempts to confirm the latest fresh token.
 			attempts: 0,
@@ -124,7 +131,14 @@ export const reatomConvexAuth = (
 	const fetchToken = async (fetcher: AuthTokenFetcher, forceRefreshToken: boolean) => {
 		const rt = peek(runtime)
 		const version = ++rt.configVersion
-		const token = await wrap(fetcher({ forceRefreshToken }))
+		let token: Awaited<ReturnType<AuthTokenFetcher>>
+		try {
+			token = await wrap(fetcher({ forceRefreshToken }))
+		} catch (error) {
+			if (version !== rt.configVersion) return null
+			logger.error(`Failed to fetch auth token: ${String(error)}`)
+			token = null
+		}
 		return version === rt.configVersion ? { value: token } : null
 	}
 
@@ -165,7 +179,7 @@ export const reatomConvexAuth = (
 	const refetchToken = async () => {
 		const current = state()
 		if (current.state === 'noAuth') return
-		const token = await fetchToken(current.config.fetchToken, true)
+		const token = await wrap(fetchToken(current.config.fetchToken, true))
 		if (!token) return
 		if (token.value && token.value !== sync.token()) {
 			setState({
@@ -185,6 +199,12 @@ export const reatomConvexAuth = (
 		sync.tryRestartSocket()
 	}
 
+	const rejectAuth = (current: AuthState, message: AuthError) => {
+		logger.error(`Failed to authenticate: "${message.error}", check your server auth config`)
+		if (sync.token() !== undefined) sync.dropToken()
+		if (current.state !== 'noAuth') reportFailed(current.config)
+	}
+
 	// Like `refetchToken`, but with the socket stopped so requests don't retry with bad auth.
 	const reauthenticate = async (message: AuthError) => {
 		const current = state()
@@ -194,17 +214,15 @@ export const reatomConvexAuth = (
 			(current.state === 'waitingForServerConfirmationOfFreshToken' &&
 				rt.attempts >= MAX_TOKEN_CONFIRMATION_ATTEMPTS)
 		) {
-			logger.error(`Failed to authenticate: "${message.error}", check your server auth config`)
-			if (sync.token() !== undefined) sync.dropToken()
-			if (current.state !== 'noAuth') reportFailed(current.config)
-			return
+			return rejectAuth(current, message)
 		}
 		if (current.state === 'waitingForServerConfirmationOfFreshToken') rt.attempts++
 		notifyRefreshChange(true)
+		const epoch = rt.configEpoch
 		await wrap(sync.stopSocket())
 		// `setConfig` or `stop` ran meanwhile.
-		if (state().state === 'noAuth') return
-		const token = await fetchToken(current.config.fetchToken, true)
+		if (epoch !== rt.configEpoch || state().state === 'noAuth') return
+		const token = await wrap(fetchToken(current.config.fetchToken, true))
 		if (!token) return
 		if (token.value && token.value !== sync.token()) {
 			sync.authenticate(token.value)
@@ -229,9 +247,11 @@ export const reatomConvexAuth = (
 			onAuthChange: (isAuthenticated: boolean) => void,
 			onRefreshChange?: (isRefreshing: boolean) => void,
 		) {
+			const rt = peek(runtime)
+			const epoch = ++rt.configEpoch
 			reset()
 			sync.pauseSocket()
-			const token = await fetchToken(fetcher, false)
+			const token = await wrap(fetchToken(fetcher, false))
 			if (!token) return
 			const config: AuthConfig = { fetchToken: fetcher, onAuthChange, onRefreshChange }
 			if (token.value) {
@@ -241,7 +261,7 @@ export const reatomConvexAuth = (
 				setState({ state: 'initialRefetch', config })
 				await wrap(refetchToken())
 			}
-			sync.resumeSocket()
+			if (epoch === rt.configEpoch) sync.resumeSocket()
 		},
 
 		onTransition(message: Transition) {
@@ -285,6 +305,7 @@ export const reatomConvexAuth = (
 		stop() {
 			reset()
 			peek(runtime).configVersion++
+			peek(runtime).configEpoch++
 		},
 	}
 }

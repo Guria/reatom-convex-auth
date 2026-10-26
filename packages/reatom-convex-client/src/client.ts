@@ -90,12 +90,12 @@ type Entry = QueryEntry & {
 
 type Request = {
 	message: RequestMessage
-	status: 'NotSent' | 'Requested' | 'Completed'
 	requestedAt: number
 	resolve: (result: FunctionResult) => void
-	result?: FunctionResult
-	ts?: bigint
-}
+} & (
+	| { status: 'NotSent' | 'Requested' }
+	| { status: 'Completed'; result: FunctionResult; ts: bigint }
+)
 
 type OptimisticUpdateAndId = {
 	requestId: RequestId
@@ -489,8 +489,8 @@ export const reatomConvexClient = (
 		const rt = peek(runtime)
 		const done = new Set<RequestId>()
 		for (const [requestId, current] of requests()) {
-			if (current.status !== 'Completed' || current.ts! > ts) continue
-			current.resolve(current.result!)
+			if (current.status !== 'Completed' || current.ts > ts) continue
+			current.resolve(current.result)
 			done.add(requestId)
 			rt.requestsOlderThanRestart.delete(requestId)
 		}
@@ -594,11 +594,13 @@ export const reatomConvexClient = (
 		}
 		const value = authToken()
 		rt.paused = false
-		if (value !== undefined) {
-			const baseVersion = identityVersion()
-			identityVersion.set(baseVersion + 1)
-			socket.send({ type: 'Authenticate', tokenType: 'User', value, baseVersion })
-		}
+		const baseVersion = identityVersion()
+		identityVersion.set(baseVersion + 1)
+		socket.send(
+			value === undefined
+				? { type: 'Authenticate', tokenType: 'None', baseVersion }
+				: { type: 'Authenticate', tokenType: 'User', value, baseVersion },
+		)
 		if (querySet) socket.send(querySet)
 		for (const message of resumeRequests()) socket.send(message)
 	}
@@ -814,6 +816,8 @@ export const reatomConvexClient = (
 			start()
 			auth.stop()
 			sync.clearAuth()
+			socket.resume()
+			socket.tryRestart()
 		},
 		/** Closes the socket for good and stops auth. */
 		close(): Promise<void> {

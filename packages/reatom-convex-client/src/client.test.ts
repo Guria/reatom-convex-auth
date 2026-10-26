@@ -471,3 +471,74 @@ test('validates the deployment URL', () => {
 	expect(() => reatomConvexClient('https://x.convex.site', {}, 'bad')).toThrow('.convex.site')
 	expect(() => reatomConvexClient('https://', {}, 'bad')).toThrow('not a valid URL')
 })
+
+test('clearing auth during a fetch resumes queries and ignores the late token', async () => {
+	const local = createClient({ expectAuth: true })
+	const convex = reatomConvex(() => local, 'convex')
+	const whoami = convex.query(api.whoami, () => ({}), 'whoami')
+	const unsubscribe = whoami.data.subscribe(() => {})
+	let resolveToken!: (token: string) => void
+	convex.setAuth(
+		() =>
+			new Promise((resolve) => {
+				resolveToken = resolve
+			}),
+	)
+	await server.settled()
+	convex.clearAuth()
+	await eventually(() => expect(whoami.data()).toBeNull())
+	resolveToken(fakeJwt({ sub: 'ada' }))
+	await server.settled()
+	expect(local.authToken()).toBeUndefined()
+	expect(convex.serverAuthenticated()).toBe(false)
+	unsubscribe()
+})
+
+test('a rejected token fetch reports unauthenticated and releases queries', async () => {
+	const convex = reatomConvex(() => client, 'convex')
+	const whoami = convex.query(api.whoami, () => ({}), 'whoami')
+	const unsubscribe = whoami.data.subscribe(() => {})
+	convex.setAuth(async () => {
+		throw new Error('offline token provider')
+	})
+	await eventually(() => expect(convex.serverAuthenticated()).toBe(false))
+	await eventually(() => expect(whoami.data()).toBeNull())
+	expect(client.authToken()).toBeUndefined()
+	unsubscribe()
+})
+
+test('a disconnected paginated query restarts from its first page', async () => {
+	items = Array.from({ length: 6 }, (_, index) => ({ _id: `i${index}`, text: `${index}` }))
+	const convex = reatomConvex(() => client, 'convex')
+	const list = convex.paginatedQuery(api.items, () => ({}), { initialNumItems: 2 }, 'list')
+	const unsubscribe = list.results.subscribe(() => {})
+	await eventually(() => expect(list.results()).toHaveLength(2))
+	list.loadMore(2)
+	await eventually(() => expect(list.results()).toHaveLength(4))
+	unsubscribe()
+	await eventually(() => expect(server.subscriptionCount('test:items')).toBe(0))
+	const again = list.results.subscribe(() => {})
+	await eventually(() => expect(list.results()).toHaveLength(2))
+	expect(server.subscriptionCount('test:items')).toBe(1)
+	again()
+})
+
+test('replacing an auth fetch ignores the older answer', async () => {
+	const convex = reatomConvex(() => client, 'convex')
+	const whoami = convex.query(api.whoami, () => ({}), 'whoami')
+	const unsubscribe = whoami.data.subscribe(() => {})
+	let resolveOld!: (token: string) => void
+	convex.setAuth(
+		() =>
+			new Promise((resolve) => {
+				resolveOld = resolve
+			}),
+	)
+	convex.setAuth(async () => fakeJwt({ sub: 'ada' }))
+	await eventually(() => expect(whoami.data()).toBe('ada'))
+	resolveOld(fakeJwt({ sub: 'mallory' }))
+	await server.settled()
+	expect(convex.serverAuthenticated()).toBe(true)
+	expect(whoami.data()).toBe('ada')
+	unsubscribe()
+})
