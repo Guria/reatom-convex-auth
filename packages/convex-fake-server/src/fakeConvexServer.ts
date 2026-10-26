@@ -16,6 +16,8 @@ export type FakeFunctionContext = {
 type FakeFunction = (ctx: FakeFunctionContext, args: Record<string, Value>) => unknown
 
 export type FakeConvexServerOptions = {
+	/** Query-set responses per client message, or one response after the queued burst. */
+	queryResponses?: 'per-message' | 'coalesced'
 	queries?: Record<string, FakeFunction>
 	mutations?: Record<string, FakeFunction>
 	actions?: Record<string, FakeFunction>
@@ -119,6 +121,7 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 	const connections = new Set<Connection>()
 	let ts = 1
 	let online = true
+	let queryTransitions = 0
 	// Connection attempts made offline hang, as in a network partition.
 	const pendingOpens = new Set<() => void>()
 
@@ -134,6 +137,7 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 	}
 
 	const send = (connection: Connection, message: Record<string, unknown>) => {
+		if (message['type'] === 'Transition') queryTransitions++
 		const data = JSON.stringify(message)
 		later(() => connection.socket.deliver(data))
 	}
@@ -196,6 +200,24 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 
 	const broadcast = () => connections.forEach((connection) => transition(connection))
 
+	const pendingTransitions = new Map<Connection, number[]>()
+	const respondToQuerySet = (connection: Connection, added: Set<number>, removed: number[]) => {
+		if (options.queryResponses !== 'coalesced') {
+			transition(connection, { force: true, only: added, removed })
+			return
+		}
+		const pending = pendingTransitions.get(connection)
+		if (pending) {
+			pending.push(...removed)
+			return
+		}
+		pendingTransitions.set(connection, removed)
+		later(() => {
+			pendingTransitions.delete(connection)
+			if (connections.has(connection)) transition(connection, { force: true, removed })
+		})
+	}
+
 	const modifyQuerySet = (connection: Connection, message: ClientMessage) => {
 		const added = new Set<number>()
 		const removed: number[] = []
@@ -215,7 +237,7 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 			}
 		}
 		connection.querySetVersion = message['newVersion'] as number
-		transition(connection, { force: true, only: added, removed })
+		respondToQuerySet(connection, added, removed)
 	}
 
 	const authenticateConnection = (connection: Connection, message: ClientMessage) => {
@@ -412,6 +434,8 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 		},
 		/** Connection attempts waiting for the server to come back online. */
 		pendingConnections: () => pendingOpens.size,
+		/** Number of transitions scheduled for delivery. */
+		transitionCount: () => queryTransitions,
 		/** Server-side subscriptions to `udfPath` across connections. */
 		subscriptionCount: (udfPath: string) =>
 			[...connections].reduce(
