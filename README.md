@@ -7,6 +7,11 @@ An experiment in binding [Convex](https://convex.dev) to
 - `packages/reatom-convex`: a Reatom binding that covers what `convex/react`
   does, with state in atoms instead of hooks. See
   [Compared with convex/react](#compared-with-convexreact).
+- `packages/reatom-convex-client`: an experimental native Reatom websocket
+  client, without `convex/browser` at runtime. Its
+  [report](packages/reatom-convex-client/README.md) covers compatibility,
+  measurements and missing features. `mise run dev:native` runs the app on it;
+  the default remains the original binding.
 - Convex Auth and better-auth on one deployment, behind one session model.
   See [Auth providers](#auth-providers).
 - `packages/bench`: a browser benchmark of the binding against convex/react,
