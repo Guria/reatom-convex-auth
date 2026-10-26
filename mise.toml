@@ -147,6 +147,11 @@ arg "[rest]" help="Additional arguments to pass to Vite"
 '''
 run = "nub exec vp dev --port ${usage_port?} ${usage_rest}"
 
+[tasks."dev:native"]
+description = "Run the app with the experimental native Reatom Convex client"
+depends = ["prepare:codegen"]
+run = "nub exec vp dev --config vite.native.config.ts --port 5173"
+
 [tasks."convex:dev"]
 description = "Run the Convex backend and push functions on change (local deployment, no login)"
 run = '''
@@ -166,6 +171,10 @@ run = "nub scripts/convex-env.ts"
 [tasks."convex:smoke"]
 description = "Sign up with both auth providers against the running Convex backend"
 run = "nub scripts/convex-smoke.ts"
+
+[tasks."convex:smoke:native"]
+description = "Check the native websocket client with both providers on the local backend"
+run = "nub scripts/convex-smoke.ts --native"
 
 [tasks."e2e:real"]
 description = "Browser journeys for both providers against the running app and Convex backend"

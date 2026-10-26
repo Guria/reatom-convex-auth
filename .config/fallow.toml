@@ -1,4 +1,5 @@
 entry = [
+	"vite.native.config.ts",
 	"scripts/**/*.ts",
 	"packages/bench/run.ts",
 	"packages/bench/main.tsx",
@@ -21,6 +22,8 @@ ignoreDependencies = [
 	"steiger",
 	"storybook",
 	"zod",
+	# Injected into backend.ts by vite.native.config.ts, not a static root import.
+	"reatom-convex-client",
 ]
 
 # The skeleton keeps these shared extension points even when its starter screens do not
@@ -55,5 +58,11 @@ ignorePatterns = [
 ]
 
 [duplicates]
-ignore = ["messages/**", "src/**/*.stories.tsx"]
+ignore = [
+	"messages/**",
+	"src/**/*.stories.tsx",
+	# The experiment deliberately matches the binding's public API without
+	# coupling the clients. Its query state adapters share that boilerplate.
+	"packages/reatom-convex-client/src/reatomConvex.ts",
+]
 ignoreImports = true

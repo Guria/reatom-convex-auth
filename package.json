@@ -75,6 +75,7 @@
 		"fallow": "^3.5.1",
 		"msw-storybook-addon": "^3.0.3",
 		"playwright": "^1.61.1",
+		"reatom-convex-client": "workspace:*",
 		"steiger": "^0.6.0",
 		"storybook": "~10.4.6",
 		"typescript": "npm:@typescript/typescript6@^6.0.2",
