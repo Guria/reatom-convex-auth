@@ -40,6 +40,7 @@ export default defineConfig({
 			include: [
 				'src/**/*.{ts,tsx}',
 				'packages/reatom-convex/src/**/*.ts',
+				'packages/reatom-convex-client/src/**/*.ts',
 				'packages/convex-fake-server/src/**/*.ts',
 				'convex/notes.ts',
 				'convex/viewer.ts',
