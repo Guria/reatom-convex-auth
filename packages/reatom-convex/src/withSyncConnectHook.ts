@@ -14,6 +14,9 @@ import {
  * abortable frame. The cleanup runs from a call hook on `onConnect.abort`,
  * outside the aborted scope: `withConnectHook` subscribes to the abort signal
  * and spawns a frame instead, which builds two AbortErrors per disconnect.
+ * The cleanup runs on disconnect only, not when `connect`'s controller is
+ * aborted directly, and it does not see variables set in `connect`. The
+ * binding's query subscriptions rely on neither.
  */
 export const withSyncConnectHook =
 	<Target extends AtomLike>(connect: () => () => void): Ext<Target> =>

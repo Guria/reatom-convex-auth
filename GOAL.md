@@ -53,7 +53,7 @@ checked; no frontend code changed in between.
       shared RS256 key (`mise run convex:env`); better-auth lives at
       `/api/better-auth`; a `provider` claim tells the tokens apart.
 - [x] Reatom↔Convex binding in `shared/api`: client, query subscription with connect-hook cleanup, mutation, two-phase auth state
-      (unit tests `src/shared/api/convex/reatomConvex.test.ts`: subscribe on
+      (unit tests `packages/reatom-convex/src/reatomConvex.test.ts`: subscribe on
       connect, re-subscribe on args change, unsubscribe on disconnect, errors
       stored, server ack tracked)
 - [x] Convex Auth adapter (`shared/api/auth/convexAuth.ts`, own client for `auth:signIn`/`auth:signOut`)
@@ -82,7 +82,7 @@ checked; no frontend code changed in between.
       equal args with cached results shown at once, paginated queries,
       optimistic updates, actions, preloaded payloads, auth refresh state,
       connection state. Proof: 11 unit tests in
-      `src/shared/api/convex/reatomConvex.test.ts` against the real `ConvexClient`
+      `packages/reatom-convex/src/reatomConvex.test.ts` against the real `ConvexClient`
 - [x] protocol-level fake server, so stories and unit tests run the real client
       (`packages/convex-fake-server/src/fakeConvexServer.ts`)
 - [x] app uses the new features: paginated notes with "Load more", optimistic
@@ -97,4 +97,4 @@ checked; no frontend code changed in between.
 - [x] `mise run validate` green (exit 0, 67 tests)
 - [x] @reatom/jsx in the benchmark matrix: the same binding rendered without
       React (`packages/bench/reatomJsx.tsx`), runtime and bundle size. `mise run bench`
-      passes with three columns.
+      passes with five columns.
