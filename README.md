@@ -1,6 +1,17 @@
 # Reatom Convex Auth
 
-A production-ready React application built on the [Karkas](https://github.com/apphane-dev/karkas) stack.
+An experiment in binding [Convex](https://convex.dev) to
+[Reatom](https://github.com/reatom/reatom) v1001, built on the
+[Karkas](https://github.com/apphane-dev/karkas) stack:
+
+- `packages/reatom-convex`: a Reatom binding that covers what `convex/react`
+  does, with state in atoms instead of hooks. See
+  [Compared with convex/react](#compared-with-convexreact).
+- Convex Auth and better-auth on one deployment, behind one session model.
+  See [Auth providers](#auth-providers).
+- `packages/bench`: a browser benchmark of the binding against convex/react,
+  rendered by @reatom/react and @reatom/jsx. See
+  [packages/bench/README.md](packages/bench/README.md).
 
 ## Stack
 
@@ -124,8 +135,9 @@ binding's optimistic updates: the notes page adds notes through `insertAtTop`.
 `mise run bench` measures convex/react against the binding rendered by
 @reatom/react and by @reatom/jsx. Single queries, mutations and pagination
 come out within a few tenths of a millisecond. With 1000 subscriptions at
-once, @reatom/react takes 1.4× as long to mount and 2.3× to unmount;
-@reatom/jsx takes 1.2× for both and updates shared queries 4× faster. See
+once, @reatom/react takes 1.25× as long to mount and 2.2× to unmount;
+@reatom/jsx takes 1.1× and 1.2×, and updates 1000 readers of one query about
+3× faster. See
 [packages/bench/README.md](packages/bench/README.md).
 
 ## Validation
