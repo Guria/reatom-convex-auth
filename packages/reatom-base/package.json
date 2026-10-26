@@ -1,0 +1,11 @@
+{
+	"name": "reatom-base",
+	"version": "0.0.0",
+	"private": true,
+	"description": "The Reatom build `mise run bench --matched` runs as `base`",
+	"dependencies": {
+		"@reatom/core": "https://pkg.pr.new/@reatom/core@906602e",
+		"@reatom/jsx": "https://pkg.pr.new/@reatom/jsx@906602e",
+		"@reatom/react": "https://pkg.pr.new/@reatom/react@906602e"
+	}
+}

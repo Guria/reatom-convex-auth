@@ -1,11 +1,12 @@
 # reatom-next
 
 The Reatom build `mise run bench` runs as `next`, next to the stable one in
-`packages/bench`. Nothing imports this package; the benchmark resolves
+`packages/bench`, or next to `packages/reatom-base` with `--matched`. Nothing imports this package; the benchmark resolves
 `@reatom/core`, `@reatom/react` and `@reatom/jsx` from its directory.
 
-It installs the pkg.pr.new preview of commit `45b31c8` on the Reatom branch
-`perf/abort-reason-connect-hook-jsx-runtime`. To compare another build, change
+It installs the pkg.pr.new preview of commit `f967994` on the Reatom branch
+[`perf/abort-listener-shared-reason`](https://github.com/reatom/reatom/compare/v1001...perf/abort-listener-shared-reason),
+which shares one abort reason across `abortVar` listener detaches. To compare another build, change
 those three `dependencies` in `package.json` to a release or another preview:
 
 ```json

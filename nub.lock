@@ -188,6 +188,18 @@ importers:
         specifier: 1.48.0
         version: 1.48.0(react@19.3.1)
 
+  packages/reatom-base:
+    dependencies:
+      '@reatom/core':
+        specifier: https://pkg.pr.new/@reatom/core@906602e
+        version: https://pkg.pr.new/@reatom/core@906602e
+      '@reatom/jsx':
+        specifier: https://pkg.pr.new/@reatom/jsx@906602e
+        version: https://pkg.pr.new/@reatom/jsx@906602e
+      '@reatom/react':
+        specifier: https://pkg.pr.new/@reatom/react@906602e
+        version: https://pkg.pr.new/@reatom/react@906602e
+
   packages/reatom-convex:
     devDependencies:
       '@reatom/core':
@@ -206,14 +218,14 @@ importers:
   packages/reatom-next:
     dependencies:
       '@reatom/core':
-        specifier: https://pkg.pr.new/@reatom/core@45b31c8
-        version: https://pkg.pr.new/@reatom/core@45b31c8
+        specifier: https://pkg.pr.new/@reatom/core@f967994
+        version: https://pkg.pr.new/@reatom/core@f967994
       '@reatom/jsx':
-        specifier: https://pkg.pr.new/@reatom/jsx@45b31c8
-        version: https://pkg.pr.new/@reatom/jsx@45b31c8
+        specifier: https://pkg.pr.new/@reatom/jsx@f967994
+        version: https://pkg.pr.new/@reatom/jsx@f967994
       '@reatom/react':
-        specifier: https://pkg.pr.new/@reatom/react@45b31c8
-        version: https://pkg.pr.new/@reatom/react@45b31c8
+        specifier: https://pkg.pr.new/@reatom/react@f967994
+        version: https://pkg.pr.new/@reatom/react@f967994
 
 packages:
 
@@ -2344,8 +2356,12 @@ packages:
   '@reatom/core@1001.3.0':
     resolution: {integrity: sha512-M8pZM6sWIQLIJZVaMI//tqadppk5GHV1MMjDZ0q5g3yxF1sXQs5ftgAxnitxAlP/ViwYWKxyrQI/8q1A3DeaNA==}
 
-  '@reatom/core@https://pkg.pr.new/@reatom/core@45b31c8':
-    resolution: {integrity: sha512-iz5zhkpePVyk4mi2jU+C32EiVUhlvaHvXfs3Bd5gx60XuUlrMdOWKgT/s/zMjMqSZIt2GF7fw63hyJXiaytv7g==, tarball: https://pkg.pr.new/@reatom/core@45b31c8}
+  '@reatom/core@https://pkg.pr.new/@reatom/core@906602e':
+    resolution: {integrity: sha512-zk/+ukCuAe+438mferK0Cjrh+W1xsvzFDn5ydEqqoGrZTPhWbXRgMuJHUETTaToSa2D2Pg8dXw0tXZWNdwxuGg==, tarball: https://pkg.pr.new/@reatom/core@906602e}
+    version: 1001.3.0
+
+  '@reatom/core@https://pkg.pr.new/@reatom/core@f967994':
+    resolution: {integrity: sha512-0jZodeVrlHTTIf4UgSeoltcoWa2LgQCmDm8VDYRFCgLlxaVtJhXFBsMLOUEZ4etFUdPz0LPVYlaOoAVVLZRE2w==, tarball: https://pkg.pr.new/@reatom/core@f967994}
     version: 1001.3.0
 
   '@reatom/jsx@1001.3.0':
@@ -2353,8 +2369,12 @@ packages:
     peerDependencies:
       '@reatom/core': ^1001.3.0
 
-  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@45b31c8':
-    resolution: {integrity: sha512-h5PmK4uApHwuK/cwK2FFiqrcMkTKQD9J963L/gxBAvgTK+XQgGD7QeArxLPmndd8yqFeNONxYKHKHyB1Tl862w==, tarball: https://pkg.pr.new/@reatom/jsx@45b31c8}
+  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@906602e':
+    resolution: {integrity: sha512-cwWUOSoDIyKrQROcIAr9nhbI4E8kyuW2JqhyyskO80QiOmCeyg84bLfQ7Nq4jcaDB26z/Plia5Q19uM2GG1Mdw==, tarball: https://pkg.pr.new/@reatom/jsx@906602e}
+    version: 1001.3.0
+
+  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@f967994':
+    resolution: {integrity: sha512-cwWUOSoDIyKrQROcIAr9nhbI4E8kyuW2JqhyyskO80QiOmCeyg84bLfQ7Nq4jcaDB26z/Plia5Q19uM2GG1Mdw==, tarball: https://pkg.pr.new/@reatom/jsx@f967994}
     version: 1001.3.0
 
   '@reatom/react@1001.0.1':
@@ -2364,8 +2384,12 @@ packages:
       react: '>=18.2.0'
       react-dom: '>=18.2.0'
 
-  '@reatom/react@https://pkg.pr.new/@reatom/react@45b31c8':
-    resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@45b31c8}
+  '@reatom/react@https://pkg.pr.new/@reatom/react@906602e':
+    resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@906602e}
+    version: 1001.0.1
+
+  '@reatom/react@https://pkg.pr.new/@reatom/react@f967994':
+    resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@f967994}
     version: 1001.0.1
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
@@ -7719,7 +7743,11 @@ snapshots:
     optionalDependencies:
       idb-keyval: 6.3.0
 
-  '@reatom/core@https://pkg.pr.new/@reatom/core@45b31c8':
+  '@reatom/core@https://pkg.pr.new/@reatom/core@906602e':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+
+  '@reatom/core@https://pkg.pr.new/@reatom/core@f967994':
     dependencies:
       '@standard-schema/spec': 1.1.0
 
@@ -7728,7 +7756,11 @@ snapshots:
       '@reatom/core': 1001.3.0
       csstype: 3.2.3
 
-  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@45b31c8':
+  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@906602e':
+    dependencies:
+      csstype: 3.2.3
+
+  '@reatom/jsx@https://pkg.pr.new/@reatom/jsx@f967994':
     dependencies:
       csstype: 3.2.3
 
@@ -7738,7 +7770,9 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  '@reatom/react@https://pkg.pr.new/@reatom/react@45b31c8': {}
+  '@reatom/react@https://pkg.pr.new/@reatom/react@906602e': {}
+
+  '@reatom/react@https://pkg.pr.new/@reatom/react@f967994': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
     optional: true
