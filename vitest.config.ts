@@ -57,6 +57,19 @@ export default defineConfig({
 			{
 				extends: true,
 				test: {
+					name: 'benchmark',
+					include: ['packages/bench/*.test.ts'],
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright(),
+						instances: [{ browser: 'chromium' }],
+					},
+				},
+			},
+			{
+				extends: true,
+				test: {
 					name: 'unit',
 					include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.ts'],
 					exclude: ['src/**/*.stories.tsx'],

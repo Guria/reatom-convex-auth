@@ -20,15 +20,15 @@ import { reatomJsx } from './reatomJsx'
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
 
-type Config = { items: number }
+type Config = { items: number; queryResponses: 'per-message' | 'coalesced' }
 type Sample = { ms: number; renders: number; commits: number }
 
 const allBindings = [official, reatom, reatomJsx]
 
 const settle = (server: BenchServer) => server.server.settled()
 
-async function session<T>(binding: Binding, run: (ctx: Context) => Promise<T>) {
-	const server = createBenchServer()
+async function session<T>(binding: Binding, config: Config, run: (ctx: Context) => Promise<T>) {
+	const server = createBenchServer(config.queryResponses)
 	// @reatom/jsx observes the container's parent, so it is attached first.
 	const container = document.createElement('div')
 	document.body.append(container)
@@ -46,7 +46,11 @@ async function session<T>(binding: Binding, run: (ctx: Context) => Promise<T>) {
 type Context = { server: BenchServer; instance: BenchInstance; container: HTMLElement }
 
 /** Times `act` until `done`, counting renders and commits. */
-async function measure(container: Element, act: () => void, done: () => boolean): Promise<Sample> {
+async function measure(
+	container: Element,
+	act: () => void,
+	done: Parameters<typeof until>[1],
+): Promise<Sample> {
 	counters.renders = 0
 	counters.commits = 0
 	const start = performance.now()
@@ -55,23 +59,21 @@ async function measure(container: Element, act: () => void, done: () => boolean)
 	return { ms: end - start, renders: counters.renders, commits: counters.commits }
 }
 
-const count = (container: Element, selector: string) => container.querySelectorAll(selector).length
-
 type Scenario = (binding: Binding, config: Config) => Promise<Record<string, Sample>>
 
 // N components, each with its own query.
-const distinctQueries: Scenario = (binding, { items }) =>
-	session(binding, async ({ server, instance, container }) => {
+const distinctQueries: Scenario = (binding, config) =>
+	session(binding, config, async ({ server, instance, container }) => {
+		const { items } = config
 		const ids = Array.from({ length: items }, (_, index) => index)
-		const all = (v: number) => () => count(container, `[data-v="${v}"]`) === items
+		const all = (v: number) => ({ selector: `[data-v="${v}"]`, count: config.items })
 		const mount = await measure(container, () => instance.items(ids), all(0))
 		const updateAll = await measure(container, () => server.bump(ids), all(1))
 		const middle = Math.floor(items / 2)
-		const updateOne = await measure(
-			container,
-			() => server.bump([middle]),
-			() => count(container, `[data-id="${middle}"][data-v="2"]`) === 1,
-		)
+		const updateOne = await measure(container, () => server.bump([middle]), {
+			selector: `[data-id="${middle}"][data-v="2"]`,
+			count: 1,
+		})
 		// Later stray renders count too.
 		await settle(server)
 		updateOne.renders = counters.renders
@@ -83,50 +85,48 @@ const distinctQueries: Scenario = (binding, { items }) =>
 	})
 
 // N components reading one query.
-const sharedQuery: Scenario = (binding, { items }) =>
-	session(binding, async ({ server, instance, container }) => {
-		const all = (v: number) => () => count(container, `[data-v="${v}"]`) === items
-		const mount = await measure(container, () => instance.shared(items), all(0))
+const sharedQuery: Scenario = (binding, config) =>
+	session(binding, config, async ({ server, instance, container }) => {
+		const all = (v: number) => ({ selector: `[data-v="${v}"]`, count: config.items })
+		const mount = await measure(container, () => instance.shared(config.items), all(0))
 		const update = await measure(container, () => server.bump([0]), all(1))
 		return { 'shared mount': mount, 'shared update': update }
 	})
 
-const optimisticMutation: Scenario = (binding) =>
-	session(binding, async ({ instance, container }) => {
+const optimisticMutation: Scenario = (binding, config) =>
+	session(binding, config, async ({ instance, container }) => {
 		const handle: Handle = {}
 		instance.list(handle)
-		await until(container, () => count(container, 'li') === LIST_SIZE)
-		const first = () => container.querySelector('li')?.textContent
+		await until(container, { selector: 'li', count: LIST_SIZE })
 		counters.renders = 0
 		counters.commits = 0
 		const start = performance.now()
 		const confirmed = handle.add!('fresh')
-		const shownAt = await until(container, () => first() === 'fresh')
+		const shownAt = await until(container, { selector: 'li', firstText: 'fresh' })
 		const shown = { ms: shownAt - start, renders: 0, commits: counters.commits }
 		await confirmed
 		// The server's list keeps its size; the optimistic one had one more.
-		const confirmedAt = await until(
-			container,
-			() => count(container, 'li') === LIST_SIZE && first() === 'fresh',
-		)
+		const confirmedAt = await until(container, {
+			selector: 'li',
+			count: LIST_SIZE,
+			firstText: 'fresh',
+		})
 		const roundTrip = { ms: confirmedAt - start, renders: 0, commits: counters.commits }
 		return { 'optimistic shown': shown, 'mutation confirmed': roundTrip }
 	})
 
-const pagination: Scenario = (binding) =>
-	session(binding, async ({ instance, container }) => {
+const pagination: Scenario = (binding, config) =>
+	session(binding, config, async ({ instance, container }) => {
 		const handle: Handle = {}
 		const pageSize = 25
-		const first = await measure(
-			container,
-			() => instance.pages(pageSize, handle),
-			() => count(container, 'li') === pageSize,
-		)
-		const more = await measure(
-			container,
-			() => handle.loadMore!(pageSize),
-			() => count(container, 'li') === pageSize * 2,
-		)
+		const first = await measure(container, () => instance.pages(pageSize, handle), {
+			selector: 'li',
+			count: pageSize,
+		})
+		const more = await measure(container, () => handle.loadMore!(pageSize), {
+			selector: 'li',
+			count: pageSize * 2,
+		})
 		return { 'first page': first, 'load more': more }
 	})
 

@@ -22,13 +22,22 @@ const { values: options } = parseArgs({
 		iterations: { type: 'string', default: '15' },
 		warmup: { type: 'string', default: '3' },
 		write: { type: 'boolean', default: false },
+		matched: { type: 'boolean', default: false },
 	},
 })
-const config = {
-	items: Number(options.items),
-	iterations: Number(options.iterations),
-	warmup: Number(options.warmup),
+const integer = (value: string, name: string, minimum = 1) => {
+	const number = Number(value)
+	if (!Number.isSafeInteger(number) || number < minimum)
+		throw new Error(`${name} must be an integer >= ${minimum}`)
+	return number
 }
+const config = {
+	items: integer(options.items, 'items'),
+	iterations: integer(options.iterations, 'iterations'),
+	warmup: integer(options.warmup, 'warmup', 0),
+}
+const workloads = ['per-message', 'coalesced'] as const
+const outputName = options.matched ? 'RESULTS_MATCHED' : 'RESULTS'
 
 const benchDir = import.meta.dirname
 const outDir = path.resolve(benchDir, '../../.var/bench/runtime')
@@ -110,7 +119,9 @@ function reatomBuild(name: string, dir: string) {
 type ReatomBuild = ReturnType<typeof reatomBuild>
 
 const builds = [
-	reatomBuild('stable', benchDir),
+	options.matched
+		? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
+		: reatomBuild('stable', benchDir),
 	reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
 ]
 
@@ -194,7 +205,13 @@ async function openPages() {
 type Run = (typeof COLUMNS)[number] & { page: Page }
 
 /** Runs every scenario for every column, starting at column `shift`. */
-async function iteration(runs: Run[], shift: number, scenarios: string[], errors: string[]) {
+async function iteration(
+	runs: Run[],
+	shift: number,
+	scenarios: string[],
+	errors: string[],
+	queryResponses: (typeof workloads)[number],
+) {
 	const order = [...runs.slice(shift), ...runs.slice(0, shift)]
 	const samples: Array<{ label: string; byName: Record<string, Sample> }> = []
 	for (const scenario of scenarios) {
@@ -204,8 +221,9 @@ async function iteration(runs: Run[], shift: number, scenarios: string[], errors
 				(input) =>
 					(window as unknown as { bench: Bench }).bench.run(input.binding, input.scenario, {
 						items: input.items,
+						queryResponses: input.queryResponses,
 					}),
-				{ binding, scenario, items: config.items },
+				{ binding, scenario, items: config.items, queryResponses },
 			)
 			if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`)
 			samples.push({ label, byName })
@@ -221,6 +239,20 @@ const record = (results: Results, samples: Awaited<ReturnType<typeof iteration>>
 		)
 		.forEach(({ label, name, sample }) => ((results[name] ??= {})[label] ??= []).push(sample))
 
+const workloadOrder = (index: number) => (index % 2 ? [...workloads].reverse() : workloads)
+
+async function iterations(runs: Run[], scenarios: string[], errors: string[]) {
+	const results: Record<(typeof workloads)[number], Results> = { 'per-message': {}, coalesced: {} }
+	// The first column and the workload order rotate; warmup samples are dropped.
+	for (const index of Array.from({ length: config.warmup + config.iterations }, (_, i) => i)) {
+		for (const workload of workloadOrder(index)) {
+			const samples = await iteration(runs, index % runs.length, scenarios, errors, workload)
+			if (index >= config.warmup) record(results[workload], samples)
+		}
+	}
+	return results
+}
+
 async function runtime() {
 	const { browser, pages, errors, close } = await openPages()
 	try {
@@ -228,12 +260,7 @@ async function runtime() {
 		const scenarios = await runs[0]!.page.evaluate(
 			() => (window as unknown as { bench: Bench }).bench.scenarios,
 		)
-		const results: Results = {}
-		for (let index = 0; index < config.warmup + config.iterations; index++) {
-			// The first column rotates; warmup samples are dropped.
-			const samples = await iteration(runs, index % runs.length, scenarios, errors)
-			if (index >= config.warmup) record(results, samples)
-		}
+		const results = await iterations(runs, scenarios, errors)
 		const versions = new Map([...pages].map(([reatom, { version }]) => [reatom, version]))
 		return { results, versions, browserVersion: browser.version() }
 	} finally {
@@ -332,7 +359,24 @@ async function sizes() {
 }
 
 const { results, versions, browserVersion } = await runtime()
-const tables = runtimeTables(results)
+const workloadReports = workloads
+	.map((workload) => {
+		const tables = runtimeTables(results[workload])
+		return `### ${workload === 'per-message' ? 'Per-message responses, stress case' : 'Coalesced query-set responses'}
+
+Median ms, with the ratio to convex/react:
+
+${tables.times}
+
+Interquartile range, ms:
+
+${tables.spread}
+
+Item renders / React commits, medians. JSX counts bound-value recomputes:
+
+${tables.counts}`
+	})
+	.join('\n\n')
 const sizeTable = await sizes()
 const buildList = builds
 	.map(
@@ -342,7 +386,7 @@ const buildList = builds
 	.join('\n')
 const report = `# convex/react vs the Reatom binding
 
-Generated by \`mise run bench\` on ${new Date().toISOString().slice(0, 10)}.
+Generated by \`mise run bench${options.matched ? ' --matched' : ''}\` on ${new Date().toISOString().slice(0, 10)}.
 ${os.cpus()[0]?.model ?? 'unknown CPU'}, ${os.platform()} ${os.release()}, Node ${process.version}, Chromium ${browserVersion}.
 ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} components where a scenario mounts many.
 
@@ -355,23 +399,19 @@ ${buildList}
 Production builds run the same scenarios for convex/react, the Reatom binding
 rendered by @reatom/react, and the same binding rendered by @reatom/jsx. Each
 Reatom build gets its own page, so a page never loads two Reatom copies;
-convex/react runs in the stable page. Each run gets a fresh in-process Convex
+convex/react runs in the baseline page. Each run gets a fresh in-process Convex
 server (packages/convex-fake-server), client and container. Every iteration
 runs all five columns across both pages, and the column that goes first
-rotates. Times run from the action to the DOM change.
+rotates. Workload order also alternates. Times run from the action to the
+DOM change. The completion observer scans the container once, then updates a
+set of matches from changed nodes. It does not rescan 1000 items per update.
 
-Median ms, with the ratio to convex/react:
+The stress case sends one response for each query-set message. The coalesced
+case waits until the currently queued query-set burst has been processed and
+sends its final state in one transition. These are synthetic response shapes,
+not a claim about the response grouping of a deployed Convex backend.
 
-${tables.times}
-
-Interquartile range, ms:
-
-${tables.spread}
-
-Item renders / React commits, medians. Renders count item component renders
-(for @reatom/jsx, recomputes of an item's bound value):
-
-${tables.counts}
+${workloadReports}
 
 - mount, update all, update one, unmount: ${config.items} components, each with its own query. Unmount runs until the server holds no subscriptions.
 - shared mount, shared update: ${config.items} components reading one query.
@@ -391,4 +431,20 @@ ${sizeTable}
 `
 
 console.log(report)
-if (options.write) await writeFile(path.join(benchDir, 'RESULTS.md'), report)
+if (options.write) {
+	await writeFile(path.join(benchDir, `${outputName}.md`), report)
+	await writeFile(
+		path.join(benchDir, `${outputName}.json`),
+		JSON.stringify(
+			{
+				config,
+				browserVersion,
+				generated: new Date().toISOString(),
+				builds: builds.map(({ name, describe }) => ({ name, packages: describe() })),
+				results,
+			},
+			null,
+			2,
+		) + '\n',
+	)
+}

@@ -2,10 +2,12 @@ import { createFakeConvexServer, paginate } from 'convex-fake-server'
 
 import { DATASET_SIZE, LIST_SIZE, type Note } from './api'
 
+export { until } from './completion'
+
 export { addNoteFirst, api, LIST_SIZE } from './api'
 export type { Note } from './api'
 
-export function createBenchServer() {
+export function createBenchServer(queryResponses: 'per-message' | 'coalesced') {
 	const values = new Map<number, number>()
 	let nextId = DATASET_SIZE
 	const notes: Note[] = Array.from({ length: DATASET_SIZE }, (_, index) => ({
@@ -13,6 +15,7 @@ export function createBenchServer() {
 		text: `note ${index}`,
 	}))
 	const server = createFakeConvexServer({
+		queryResponses,
 		queries: {
 			'bench:item': (_ctx, { id }) => ({ id: Number(id), v: values.get(Number(id)) ?? 0 }),
 			'bench:list': () => notes.slice(0, LIST_SIZE),
@@ -39,29 +42,6 @@ export function createBenchServer() {
 export type BenchServer = ReturnType<typeof createBenchServer>
 
 export const CLIENT_URL = 'https://bench.convex.cloud'
-
-/** Resolves with the time `done()` first holds after a DOM change under `root`. */
-export const until = (root: Element, done: () => boolean, timeout = 20_000) =>
-	new Promise<number>((resolve, reject) => {
-		if (done()) return resolve(performance.now())
-		const timer = setTimeout(() => {
-			observer.disconnect()
-			reject(new Error('Benchmark condition timed out'))
-		}, timeout)
-		const observer = new MutationObserver(() => {
-			if (!done()) return
-			const now = performance.now()
-			clearTimeout(timer)
-			observer.disconnect()
-			resolve(now)
-		})
-		observer.observe(root, {
-			subtree: true,
-			childList: true,
-			attributes: true,
-			characterData: true,
-		})
-	})
 
 /**
  * Item component renders (for @reatom/jsx, recomputes of an item's bound
