@@ -92,6 +92,23 @@ Start Storybook:
 mise run storybook
 ```
 
+## Demo
+
+https://guria.github.io/reatom-convex-auth/ runs the app against the
+production deployment of the Convex project `aleksei-gurianov/reatom-convex-auth`
+(`quirky-buffalo-548`). `.github/workflows/pages.yml` builds it on every push
+to `main` or `exp/reatom-native-convex-client`, with the deployment URLs
+written in the workflow.
+
+The backend is deployed by hand, with a Convex login. `CONVEX_DEPLOYMENT`
+selects the project over the local deployment in `.env.local`:
+
+```bash
+export CONVEX_DEPLOYMENT=dev:shiny-tortoise-848
+nub exec convex deploy
+SITE_URL=https://guria.github.io mise run convex:env --prod
+```
+
 ## Auth providers
 
 The sign-in page has an "Auth provider" radio group: Convex Auth
