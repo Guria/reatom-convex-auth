@@ -1,0 +1,42 @@
+{
+	"convex": [
+		{
+			"id": "batched",
+			"label": "Convex TS patch",
+			"threadId": "mcp:2844b1ae-4597-48a6-a8d6-009b369a0305",
+			"repository": "Guria/convex-js",
+			"commit": "fb6340de3b6bdf8b1d238e31afbaec5657416781",
+			"archive": ".var/bench/artifacts/incoming/convex-batched.tgz",
+			"sha256": "04ed727cd0ab9e291110a5c562fe52e9338c41396063acfeff904774a108af6e"
+		},
+		{
+			"id": "rewrite",
+			"label": "Reatom SDK rewrite",
+			"threadId": "mcp:b294b6c2-f858-4dc7-bebe-624aa2d9d083",
+			"repository": "Guria/convex-js",
+			"commit": "0e474ba41b1f9fc9806f785f33bfa20d4d1fe811",
+			"archive": ".var/bench/artifacts/incoming/convex-reatom-0e474ba.tgz",
+			"sha256": "922568d9bfd560fab7736e7bac623b70daad9611e63451c220c0945d50e8a5e3"
+		}
+	],
+	"core": [
+		{
+			"id": "action-base",
+			"label": "Action-log base",
+			"threadId": "mcp:d82e7971-3f8a-497f-98aa-4fe994b349d4",
+			"repository": "reatom/reatom",
+			"commit": "aee4f572c251fab2e707ba04090d7a04b3acaac3",
+			"archive": ".var/bench/artifacts/incoming/reatom-actions-base.tgz",
+			"sha256": "ed69de83985e44f554ae7d2ece409f5e749ef7e4040e55a9ee7a570ea1a673da"
+		},
+		{
+			"id": "action-patch",
+			"label": "Action-log repair",
+			"threadId": "mcp:d82e7971-3f8a-497f-98aa-4fe994b349d4",
+			"repository": "reatom/reatom",
+			"commit": "d28ab4e655bbdf23e4576dcc627c7cbf14800d49",
+			"archive": ".var/bench/artifacts/incoming/reatom-actions.tgz",
+			"sha256": "f2c62405a9a0c50097763fea5d8789a103441d5dc737a8653856c8bc500c3540"
+		}
+	]
+}

@@ -6,11 +6,13 @@
 // on the stable build; `--patched` adds convex/react and the binding on the
 // SDK with packages/convex-patched applied. `--write` saves the report to
 // RESULTS*.md.
+import type { ActionProbeKind } from './actionProbe'
 import type { Bench } from './main'
 import type { Plugin, PreviewServer } from 'vite'
 
 import react from '@vitejs/plugin-react'
 import { patchedConvex } from 'convex-patched'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -19,6 +21,14 @@ import { parseArgs } from 'node:util'
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 import { chromium, type Page } from 'playwright'
 import { build, preview } from 'vite'
+
+import {
+	artifactPlugin,
+	loadArtifacts,
+	loadCoreArtifacts,
+	type CoreArtifact,
+	type SdkArtifact,
+} from './artifacts'
 
 const { values: options } = parseArgs({
 	options: {
@@ -29,6 +39,9 @@ const { values: options } = parseArgs({
 		matched: { type: 'boolean', default: false },
 		native: { type: 'boolean', default: false },
 		patched: { type: 'boolean', default: false },
+		artifacts: { type: 'boolean', default: false },
+		'probe-abort': { type: 'boolean', default: false },
+		'probe-action': { type: 'boolean', default: false },
 		unbatched: { type: 'boolean', default: false },
 	},
 })
@@ -44,18 +57,34 @@ const config = {
 	warmup: integer(options.warmup, 'warmup', 0),
 }
 const workloads = ['per-message', 'coalesced'] as const
-const outputName = options.patched
-	? 'RESULTS_PATCHED'
-	: options.native
-		? options.unbatched
-			? 'RESULTS_NATIVE_UNBATCHED'
-			: 'RESULTS_NATIVE'
-		: options.matched
-			? 'RESULTS_MATCHED'
-			: 'RESULTS'
-if ([options.matched, options.native, options.patched].filter(Boolean).length > 1)
+const artifacts = options.artifacts ? loadArtifacts() : []
+const coreArtifacts = options['probe-action'] ? loadCoreArtifacts() : []
+const outputName = options.artifacts
+	? options['probe-action']
+		? 'RESULTS_ARTIFACTS_ACTION'
+		: options['probe-abort']
+			? 'RESULTS_ARTIFACTS_ABORT'
+			: 'RESULTS_ARTIFACTS'
+	: options.patched
+		? 'RESULTS_PATCHED'
+		: options.native
+			? options.unbatched
+				? 'RESULTS_NATIVE_UNBATCHED'
+				: 'RESULTS_NATIVE'
+			: options.matched
+				? 'RESULTS_MATCHED'
+				: 'RESULTS'
+if (
+	[options.matched, options.native, options.patched, options.artifacts].filter(Boolean).length > 1
+)
 	throw new Error('--matched, --native and --patched are separate comparisons')
 if (options.unbatched && !options.native) throw new Error('--unbatched requires --native')
+if (options['probe-abort'] && options['probe-action'])
+	throw new Error('Choose one matched Reatom pair')
+if (options['probe-action'] && !options.artifacts)
+	throw new Error('--probe-action requires --artifacts')
+if (options['probe-abort'] && !options.artifacts)
+	throw new Error('--probe-abort requires --artifacts')
 const batchQuerySet = !options.unbatched
 
 const benchDir = import.meta.dirname
@@ -95,8 +124,9 @@ const specNote = (spec: string | undefined) => (spec?.includes('/') ? ` (${spec}
  * records the package directories the builds used. A jsx-runtime entry
  * without `jsx` resolves to the adapter.
  */
-function reatomBuild(name: string, dir: string) {
+function reatomBuild(name: string, dir: string, coreArtifact?: CoreArtifact) {
 	const used = new Map<string, Set<string>>()
+	const importedFiles = new Set<string>()
 	let adapted = false
 	const record = (pkg: string, id: string) =>
 		used.set(pkg, (used.get(pkg) ?? new Set<string>()).add(packageDir(id, pkg)))
@@ -105,17 +135,19 @@ function reatomBuild(name: string, dir: string) {
 		adapted = true
 		return jsxRuntimeAdapter
 	}
+	const coreRoot = coreArtifact?.root ?? dir
+	const importer = (pkg: string) =>
+		path.join(pkg === '@reatom/core' ? coreRoot : dir, 'package.json')
 	const plugin: Plugin = {
 		name: `reatom-${name}`,
 		enforce: 'pre',
 		async resolveId(source) {
 			const pkg = reatomPackage(source)
 			if (!pkg) return
-			const resolved = await this.resolve(source, path.join(dir, 'package.json'), {
-				skipSelf: true,
-			})
+			const resolved = await this.resolve(source, importer(pkg), { skipSelf: true })
 			if (!resolved) throw new Error(`${name}: cannot resolve ${source} from ${dir}`)
 			record(pkg, resolved.id)
+			importedFiles.add(resolved.id)
 			return adapt(source, resolved)
 		},
 	}
@@ -132,7 +164,12 @@ function reatomBuild(name: string, dir: string) {
 			REATOM_PACKAGES.indexOf(a) - REATOM_PACKAGES.indexOf(b)
 		return [...used].sort(order).map(([pkg, roots]) => label(pkg, roots, specs[pkg]))
 	}
-	return { name, dir, plugin, describe }
+	const moduleHashes = () =>
+		[...importedFiles].sort().map((file) => ({
+			file: path.relative(path.resolve(benchDir, '../..'), file),
+			sha256: createHash('sha256').update(readFileSync(file)).digest('hex'),
+		}))
+	return { name, dir, plugin, describe, coreArtifact, moduleHashes }
 }
 
 type ReatomBuild = ReturnType<typeof reatomBuild>
@@ -160,15 +197,21 @@ function convexPatchedPlugin(everywhere: boolean): Plugin {
 	}
 }
 
-const builds =
-	options.native || options.patched
-		? [reatomBuild('stable', benchDir)]
-		: [
-				options.matched
-					? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
-					: reatomBuild('stable', benchDir),
-				reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
+const builds = options['probe-action']
+	? coreArtifacts.map((artifact) => reatomBuild(artifact.id, benchDir, artifact))
+	: options.artifacts && options['probe-abort']
+		? [
+				reatomBuild('abort-base', path.resolve(benchDir, '../reatom-base')),
+				reatomBuild('abort-patch', path.resolve(benchDir, '../reatom-next')),
 			]
+		: options.artifacts || options.native || options.patched
+			? [reatomBuild('stable', benchDir)]
+			: [
+					options.matched
+						? reatomBuild('base', path.resolve(benchDir, '../reatom-base'))
+						: reatomBuild('stable', benchDir),
+					reatomBuild('next', path.resolve(benchDir, '../reatom-next')),
+				]
 
 const patchedColumns = () =>
 	[
@@ -181,24 +224,46 @@ const patchedColumns = () =>
 		]),
 	].map((column) => ({ ...column, build: builds[0]! }))
 
-// convex/react loads no Reatom; it runs in the first page.
-const COLUMNS = options.patched
-	? patchedColumns()
-	: [
-			{ label: OFFICIAL, binding: OFFICIAL, build: builds[0]! },
-			...['@reatom/react', '@reatom/jsx'].flatMap((binding) =>
-				options.native
-					? [
-							{ label: `${binding} binding`, binding, build: builds[0]! },
-							{ label: `${binding} native`, binding: `${binding} native`, build: builds[0]! },
-						]
-					: builds.map((reatom) => ({
-							label: `${binding} ${reatom.name}`,
-							binding,
-							build: reatom,
-						})),
-			),
-		]
+const artifactColumns = () =>
+	builds.flatMap((reatom) =>
+		[
+			...['convex/react', '@reatom/react', '@reatom/jsx'].flatMap((binding) => [
+				{ label: binding === OFFICIAL ? OFFICIAL : `${binding} binding`, binding },
+				{ label: `${binding} ESM patch`, binding: `${binding} patched` },
+				{ label: `${binding} TS patch`, binding: `${binding} TS patch` },
+				{ label: `${binding} Reatom SDK`, binding: `${binding} Reatom SDK` },
+			]),
+			...['@reatom/react', '@reatom/jsx'].map((binding) => ({
+				label: `${binding} native`,
+				binding: `${binding} native`,
+			})),
+		].map((column) => ({
+			...column,
+			label: builds.length === 1 ? column.label : `${column.label} ${reatom.name}`,
+			build: reatom,
+		})),
+	)
+
+// The artifact rewrite also makes convex/react depend on the selected Reatom build.
+const COLUMNS = options.artifacts
+	? artifactColumns()
+	: options.patched
+		? patchedColumns()
+		: [
+				{ label: OFFICIAL, binding: OFFICIAL, build: builds[0]! },
+				...['@reatom/react', '@reatom/jsx'].flatMap((binding) =>
+					options.native
+						? [
+								{ label: `${binding} binding`, binding, build: builds[0]! },
+								{ label: `${binding} native`, binding: `${binding} native`, build: builds[0]! },
+							]
+						: builds.map((reatom) => ({
+								label: `${binding} ${reatom.name}`,
+								binding,
+								build: reatom,
+							})),
+				),
+			]
 
 const quantile = (sorted: number[], q: number) => {
 	const position = (sorted.length - 1) * q
@@ -213,12 +278,12 @@ const median = (samples: Sample[], key: 'ms' | 'renders' | 'commits') =>
 const ms = (value: number) => (value < 10 ? value.toFixed(2) : value.toFixed(1))
 
 async function buildPage(reatom: ReatomBuild) {
-	const pageDir = path.join(outDir, reatom.name)
+	const pageDir = path.join(outDir, options.artifacts ? 'artifacts' : 'existing', reatom.name)
 	await build({
 		configFile: false,
 		root: benchDir,
 		logLevel: 'warn',
-		plugins: [react(), reatom.plugin, convexPatchedPlugin(false)],
+		plugins: [react(), reatom.plugin, convexPatchedPlugin(false), artifactPlugin(artifacts)],
 		resolve: {
 			// Production React with <Profiler> callbacks, to count commits.
 			alias: [{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' }],
@@ -285,15 +350,19 @@ async function iteration(
 	for (const scenario of scenarios) {
 		for (const { label, binding, page } of order) {
 			await page.bringToFront()
-			const byName = await page.evaluate(
-				(input) =>
-					(window as unknown as { bench: Bench }).bench.run(input.binding, input.scenario, {
-						items: input.items,
-						queryResponses: input.queryResponses,
-						batchQuerySet: input.batchQuerySet,
-					}),
-				{ binding, scenario, items: config.items, queryResponses, batchQuerySet },
-			)
+			const byName = await page
+				.evaluate(
+					(input) =>
+						(window as unknown as { bench: Bench }).bench.run(input.binding, input.scenario, {
+							items: input.items,
+							queryResponses: input.queryResponses,
+							batchQuerySet: input.batchQuerySet,
+						}),
+					{ binding, scenario, items: config.items, queryResponses, batchQuerySet },
+				)
+				.catch((error: unknown) => {
+					throw new Error(`${label} / ${scenario} / ${queryResponses}: ${String(error)}`)
+				})
 			if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`)
 			samples.push({ label, byName })
 		}
@@ -322,6 +391,45 @@ async function iterations(runs: Run[], scenarios: string[], errors: string[]) {
 	return results
 }
 
+type ActionProbeSample = {
+	build: string
+	kind: ActionProbeKind
+	size: number
+	ms: number
+	calls: number
+}
+const alternate = <T>(list: readonly T[], iteration: number) =>
+	iteration % 2 ? [...list].reverse() : list
+
+/** Iteration order of the action probe: builds and kinds alternate per iteration. */
+function actionPlan() {
+	const kinds = ['plain', 'subscribed', 'hooked', 'atom'] as const
+	return Array.from({ length: config.warmup + config.iterations }, (_, iteration) =>
+		[1000, 2000, 4000, 8000].flatMap((size) =>
+			alternate(builds, iteration).flatMap((build) =>
+				alternate(kinds, iteration).map((kind) => ({ iteration, size, build, kind })),
+			),
+		),
+	).flat()
+}
+
+async function actionMeasurements(
+	pages: Map<ReatomBuild, { page: Page; version: string }>,
+): Promise<ActionProbeSample[]> {
+	if (!options['probe-action']) return []
+	const samples: ActionProbeSample[] = []
+	for (const { iteration, size, build, kind } of actionPlan()) {
+		const { page } = pages.get(build)!
+		await page.bringToFront()
+		const result = await page.evaluate(
+			(input) => (window as unknown as { bench: Bench }).bench.actionProbe(input.size, input.kind),
+			{ size, kind },
+		)
+		if (iteration >= config.warmup) samples.push({ build: build.name, kind, size, ...result })
+	}
+	return samples
+}
+
 async function runtime() {
 	const { browser, pages, errors, close } = await openPages()
 	try {
@@ -331,7 +439,8 @@ async function runtime() {
 		)
 		const results = await iterations(runs, scenarios, errors)
 		const versions = new Map([...pages].map(([reatom, { version }]) => [reatom, version]))
-		return { results, versions, browserVersion: browser.version() }
+		const actionSamples = await actionMeasurements(pages)
+		return { results, versions, browserVersion: browser.version(), actionSamples }
 	} finally {
 		await close()
 	}
@@ -339,13 +448,19 @@ async function runtime() {
 
 function runtimeTables(results: Results) {
 	const labels = COLUMNS.map((column) => column.label)
+	const baselines = new Map(
+		COLUMNS.map(({ label, build }) => [
+			label,
+			COLUMNS.find((column) => column.binding === OFFICIAL && column.build === build)!.label,
+		]),
+	)
 	const table = (cell: (samples: Sample[], official: Sample[]) => string) =>
 		[
 			`| Scenario | ${labels.join(' | ')} |`,
 			`|---|${labels.map(() => '---:').join('|')}|`,
 			...Object.entries(results).map(
 				([scenario, byLabel]) =>
-					`| ${scenario} | ${labels.map((label) => cell(byLabel[label]!, byLabel[OFFICIAL]!)).join(' | ')} |`,
+					`| ${scenario} | ${labels.map((label) => cell(byLabel[label]!, byLabel[baselines.get(label)!]!)).join(' | ')} |`,
 			),
 		].join('\n')
 	const count = (value: number) => (!value || Number.isNaN(value) ? '–' : String(value))
@@ -373,7 +488,12 @@ function runtimeTables(results: Results) {
 	}
 }
 
-async function bundleSize(entry: string, reatom?: ReatomBuild, patched = false) {
+async function bundleSize(
+	entry: string,
+	reatom?: ReatomBuild,
+	patched = false,
+	artifact?: SdkArtifact['id'],
+) {
 	const output = await build({
 		configFile: false,
 		root: benchDir,
@@ -382,6 +502,7 @@ async function bundleSize(entry: string, reatom?: ReatomBuild, patched = false) 
 			react(),
 			...(reatom ? [reatom.plugin] : []),
 			...(patched ? [convexPatchedPlugin(true)] : []),
+			artifactPlugin(artifacts, artifact),
 		],
 		build: {
 			write: false,
@@ -411,9 +532,13 @@ type SizeRow = {
 	entry: string
 	reatom?: ReatomBuild
 	patched?: boolean
+	artifact?: SdkArtifact['id']
 	/** Label of the row whose gzip size is the app's baseline. */
 	baseline?: string
 }
+
+const withPatchedApps = options.artifacts || options.patched
+const withNativeApps = withPatchedApps || options.native
 
 const appRows = (reatom: ReatomBuild): SizeRow[] => {
 	const react = `React + Reatom ${reatom.name}`
@@ -428,13 +553,13 @@ const appRows = (reatom: ReatomBuild): SizeRow[] => {
 	return [
 		app('Binding + @reatom/react', 'reatom.tsx', react),
 		app('Binding + @reatom/jsx', 'reatom-jsx.tsx', jsx),
-		...(options.patched
+		...(withPatchedApps
 			? [
 					app('Binding + @reatom/react', 'reatom.tsx', react, true),
 					app('Binding + @reatom/jsx', 'reatom-jsx.tsx', jsx, true),
 				]
 			: []),
-		...(options.native || options.patched
+		...(withNativeApps
 			? [
 					app('Native + @reatom/react', 'native.tsx', react),
 					app('Native + @reatom/jsx', 'native-jsx.tsx', jsx),
@@ -457,7 +582,7 @@ async function sizes() {
 			reatom,
 		})),
 		{ label: 'convex/react app', entry: 'official.tsx', baseline: 'React' },
-		...(options.patched
+		...(options.artifacts || options.patched
 			? [
 					{
 						label: 'convex/react app, patched SDK',
@@ -468,15 +593,44 @@ async function sizes() {
 				]
 			: []),
 		...builds.flatMap(appRows),
+		...(options.artifacts
+			? builds.flatMap((reatom) =>
+					artifacts.flatMap(({ id, label }) => [
+						{
+							label: `${label} + convex/react app ${reatom.name}`,
+							entry: 'official.tsx',
+							reatom,
+							artifact: id,
+							baseline: 'React',
+						},
+						{
+							label: `${label} + binding/react app ${reatom.name}`,
+							entry: 'reatom.tsx',
+							reatom,
+							artifact: id,
+							baseline: `React + Reatom ${reatom.name}`,
+						},
+						{
+							label: `${label} + binding/jsx app ${reatom.name}`,
+							entry: 'reatom-jsx.tsx',
+							reatom,
+							artifact: id,
+							baseline: `Reatom + @reatom/jsx ${reatom.name}`,
+						},
+					]),
+				)
+			: []),
 	]
 	const measured = await Promise.all(
-		rows.map(({ entry, reatom, patched }) => bundleSize(entry, reatom, patched)),
+		rows.map(({ entry, reatom, patched, artifact }) =>
+			bundleSize(entry, reatom, patched, artifact),
+		),
 	)
 	const byLabel = new Map(rows.map(({ label }, index) => [label, measured[index]!]))
 	const kb = (bytes: number) => (bytes / 1024).toFixed(1)
 	const added = (size: Size, baseline: string | undefined) =>
 		baseline ? `+${kb(size.gzip - byLabel.get(baseline)!.gzip)}` : ''
-	return [
+	const table = [
 		'| Bundle | min KiB | gzip KiB | brotli KiB | gzip added by Convex |',
 		'|---|---:|---:|---:|---:|',
 		...rows.map(({ label, baseline }, index) => {
@@ -484,9 +638,13 @@ async function sizes() {
 			return `| ${label} | ${kb(size.min)} | ${kb(size.gzip)} | ${kb(size.brotli)} | ${added(size, baseline)} |`
 		}),
 	].join('\n')
+	return {
+		table,
+		rows: rows.map(({ label, baseline }, index) => ({ label, baseline, ...measured[index]! })),
+	}
 }
 
-const { results, versions, browserVersion } = await runtime()
+const { results, versions, browserVersion, actionSamples } = await runtime()
 const workloadReports = workloads
 	.map((workload) => {
 		const tables = runtimeTables(results[workload])
@@ -507,22 +665,66 @@ ${tables.counts}
 Query-set transitions during mount, medians: ${tables.transitions}.`
 	})
 	.join('\n\n')
-const sizeTable = await sizes()
+const bundleSizes = await sizes()
+const sizeTable = bundleSizes.table
 const buildList = builds
 	.map(
 		(reatom) =>
-			`- ${reatom.name} (${path.relative(path.resolve(benchDir, '../..'), reatom.dir)}): ${reatom.describe().join(', ')}. The page reports \`VERSION\` ${versions.get(reatom)}.`,
+			`- ${reatom.name} (${path.relative(path.resolve(benchDir, '../..'), reatom.dir)}): ${reatom.describe().join(', ')}${reatom.coreArtifact ? `, core commit ${reatom.coreArtifact.commit}` : ''}. The page reports \`VERSION\` ${versions.get(reatom)}.`,
 	)
 	.join('\n')
-const report = `# convex/react vs the Reatom binding${options.native || options.patched ? ' and native client' : ''}${options.patched ? ' on the patched SDK' : ''}
+const provenance = [...artifacts, ...coreArtifacts].map(({ root: _root, ...artifact }) => artifact)
+const provenanceText = artifacts
+	.map(
+		({ label, repository, commit, sha256, esmSha256 }) =>
+			`- ${label}: ${repository}@${commit}, archive SHA-256 \`${sha256}\`, ESM JS tree SHA-256 \`${esmSha256}\`.`,
+	)
+	.join('\n')
+const actionReport =
+	actionSamples.length === 0
+		? ''
+		: [
+				'## Repeated-action control',
+				'',
+				'One action called N times in one tick, in Chromium. Median ms and IQR. Atom writes, subscribed actions and hooked actions are controls, not estimates of app performance.',
+				'',
+				'| Kind | N | ' + builds.map(({ name }) => name).join(' | ') + ' |',
+				'|---|---:|' + builds.map(() => '---:').join('|') + '|',
+				...(['plain', 'subscribed', 'hooked', 'atom'] as const).flatMap((kind) =>
+					[1000, 2000, 4000, 8000].map(
+						(size) =>
+							'| ' +
+							kind +
+							' | ' +
+							size +
+							' | ' +
+							builds
+								.map(({ name }) => {
+									const times = actionSamples
+										.filter(
+											(sample) =>
+												sample.build === name && sample.kind === kind && sample.size === size,
+										)
+										.map(({ ms }) => ms)
+										.sort((a, b) => a - b)
+									return `${ms(quantile(times, 0.5))} (${ms(quantile(times, 0.25))}–${ms(quantile(times, 0.75))})`
+								})
+								.join(' | ') +
+							' |',
+					),
+				),
+			].join('\n')
+const report = `# convex/react vs the Reatom binding${withNativeApps ? ' and native client' : ''}${options.patched ? ' on the patched SDK' : ''}${options.artifacts ? ' on the Guria/convex-js builds' : ''}
 
-Generated by \`mise run bench${options.matched ? ' --matched' : ''}${options.native ? ' --native' : ''}${options.patched ? ' --patched' : ''}${options.unbatched ? ' --unbatched' : ''} --items ${config.items} --iterations ${config.iterations} --warmup ${config.warmup} --write\` on ${new Date().toISOString().slice(0, 10)}.
+Generated by \`mise run bench${options.matched ? ' --matched' : ''}${options.native ? ' --native' : ''}${options.patched ? ' --patched' : ''}${options.artifacts ? ' --artifacts' : ''}${options['probe-abort'] ? ' --probe-abort' : ''}${options['probe-action'] ? ' --probe-action' : ''}${options.unbatched ? ' --unbatched' : ''} --items ${config.items} --iterations ${config.iterations} --warmup ${config.warmup} --write\` on ${new Date().toISOString().slice(0, 10)}.
 ${os.cpus()[0]?.model ?? 'unknown CPU'}, ${os.platform()} ${os.release()}, Node ${process.version}, Chromium ${browserVersion}.
 ${config.iterations} iterations after ${config.warmup} warmup, ${config.items} components where a scenario mounts many.
 
 Reatom builds, as bundled into their pages and size apps:
 
 ${buildList}
+
+${options.artifacts ? `## Thread artifacts\n\n${provenanceText}\n\nESM patch means the local published-SDK patch; TS patch means the fork tarball. Reatom SDK keeps the SDK API; native means the smaller local package with a different low-level API. Artifacts remain unmodified. Every SDK import inside a size build uses the chosen artifact. Every Reatom import, including those inside the rewritten SDK, uses the selected build.` : ''}
 
 ## Runtime
 
@@ -562,6 +764,8 @@ Convex share is measured over its own baseline: React for convex/react,
 React + Reatom or Reatom + @reatom/jsx of the same build for the binding.
 
 ${sizeTable}
+
+${actionReport}
 `
 
 console.log(report)
@@ -571,10 +775,24 @@ if (options.write) {
 		path.join(benchDir, `${outputName}.json`),
 		JSON.stringify(
 			{
-				config: { ...config, native: options.native, patched: options.patched, batchQuerySet },
+				config: {
+					...config,
+					native: options.native,
+					patched: options.patched,
+					artifacts: options.artifacts,
+					batchQuerySet,
+				},
 				browserVersion,
+				provenance,
+				bundleSizes: bundleSizes.rows,
+				actionSamples,
 				generated: new Date().toISOString(),
-				builds: builds.map(({ name, describe }) => ({ name, packages: describe() })),
+				builds: builds.map(({ name, describe, coreArtifact, moduleHashes }) => ({
+					name,
+					packages: describe(),
+					coreCommit: coreArtifact?.commit,
+					moduleHashes: moduleHashes(),
+				})),
 				results,
 			},
 			null,

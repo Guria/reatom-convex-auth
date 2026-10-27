@@ -3,6 +3,8 @@ import { reatomComponent, reatomContext } from '@reatom/react'
 import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
 import { reactView } from './reactView'
 import {
+	batchedModels,
+	rewrittenModels,
 	nativeModels,
 	patchedModels,
 	reatomModels,
@@ -62,3 +64,6 @@ const reactBinding = (
 export const reatom = reactBinding('@reatom/react', reatomModels)
 export const reatomNative = reactBinding('@reatom/react native', nativeModels)
 export const reatomPatched = reactBinding('@reatom/react patched', patchedModels)
+
+export const reatomBatched = reactBinding('@reatom/react TS patch', batchedModels)
+export const reatomRewrite = reactBinding('@reatom/react Reatom SDK', rewrittenModels)

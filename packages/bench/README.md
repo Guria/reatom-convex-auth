@@ -4,6 +4,8 @@
 mise run bench --native --write            # binding vs native, same Reatom build
 mise run bench --native --unbatched --write # control: one query-set edit per message
 mise run bench --patched --write           # also convex/react and the binding on the patched SDK
+mise run bench --artifacts --write         # the fork tarballs in artifacts.lock.json
+mise run bench --artifacts --probe-action --write # the same on both core builds of reatom/reatom#1386
 mise run bench                    # stable release vs next, print the report
 mise run bench --write            # save RESULTS.md and raw samples in RESULTS.json
 mise run bench --matched --write  # base vs next, as RESULTS_MATCHED.md/.json
@@ -32,6 +34,33 @@ to the stock and native columns, in [RESULTS_PATCHED.md](RESULTS_PATCHED.md).
 A Vite plugin resolves `convex-patched/browser` and `convex-patched/react`
 to the patched copy; the binding itself stays the same module and receives
 the patched `ConvexClient`.
+
+`--artifacts` adds the
+[Guria/convex-js](https://github.com/Guria/convex-js) builds that
+[`artifacts.lock.json`](artifacts.lock.json) pins by commit and tarball
+SHA-256, in [RESULTS_ARTIFACTS.md](RESULTS_ARTIFACTS.md):
+
+- TS patch: branch `batched-query-set-transitions`, the two changes of
+  `packages/convex-patched` ported to the SDK sources.
+- Reatom SDK: branch `reatom-browser-client`, `convex/browser` rewritten on
+  `@reatom/core` with its API unchanged.
+
+convex/react, the binding under both renderers, and the native client run
+on each SDK, 14 columns in one page. Copy each tarball (`npm pack` in the
+fork) to the lock's `archive` path. `artifacts.ts` checks its SHA-256,
+unpacks it once under `.var/bench/artifacts/<sha256>`, and fails if the
+unpacked JS changes. A Vite plugin resolves `convex-artifact-batched/*` and
+`convex-artifact-rewrite/*` to the unpacked package, and the Reatom build
+plugin resolves the rewrite's own `@reatom/core` import, so a page still
+holds one Reatom copy.
+
+`--probe-action` runs the same columns on the two `@reatom/core` builds the
+lock's `core` entries pin: the base and head of
+[reatom/reatom#1386](https://github.com/reatom/reatom/pull/1386), which stops
+copying an action's call log on every call within a tick. It adds a table of
+one action called N times in a tick (`actionProbe.ts`): plain, with a
+subscriber, with a call hook, and atom writes as a control.
+`--probe-abort` runs them on the `--matched` pair instead.
 
 The size apps share their models and renderer within each adapter, with only
 the client factory changed. This avoids comparing a smaller native feature

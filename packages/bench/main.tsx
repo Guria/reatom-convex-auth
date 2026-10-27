@@ -3,6 +3,7 @@
 // build in production mode and drives `window.bench` from Playwright.
 import { clearStack, VERSION } from '@reatom/core'
 
+import { runActionProbe } from './actionProbe'
 import {
 	counters,
 	createBenchServer,
@@ -13,9 +14,15 @@ import {
 	type Binding,
 	type Handle,
 } from './fixture'
-import { official, officialPatched } from './official'
-import { reatom, reatomNative, reatomPatched } from './reatom'
-import { reatomJsx, reatomJsxNative, reatomJsxPatched } from './reatomJsx'
+import { official, officialPatched, officialBatched, officialRewrite } from './official'
+import { reatom, reatomNative, reatomPatched, reatomBatched, reatomRewrite } from './reatom'
+import {
+	reatomJsx,
+	reatomJsxNative,
+	reatomJsxPatched,
+	reatomJsxBatched,
+	reatomJsxRewrite,
+} from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
@@ -29,6 +36,12 @@ type Sample = { ms: number; renders: number; commits: number; transitions?: numb
 
 const allBindings = [
 	official,
+	officialBatched,
+	officialRewrite,
+	reatomBatched,
+	reatomRewrite,
+	reatomJsxBatched,
+	reatomJsxRewrite,
 	officialPatched,
 	reatom,
 	reatomNative,
@@ -46,8 +59,12 @@ async function session<T>(binding: Binding, config: Config, run: (ctx: Context) 
 	const container = document.createElement('div')
 	document.body.append(container)
 	const instance = binding.create(server, container, { batchQuerySet: config.batchQuerySet })
-	while (!instance.connected()) await settle(server)
 	try {
+		const deadline = performance.now() + 10_000
+		while (!instance.connected()) {
+			if (performance.now() > deadline) throw new Error(`${binding.label}: connection timed out`)
+			await settle(server)
+		}
 		return await run({ server, instance, container })
 	} finally {
 		await instance.close()
@@ -167,7 +184,12 @@ async function runOnce(label: string, scenario: string, config: Config) {
 	)
 }
 
-const bench = { version: VERSION, scenarios: Object.keys(allScenarios), run: runOnce }
+const bench = {
+	version: VERSION,
+	scenarios: Object.keys(allScenarios),
+	run: runOnce,
+	actionProbe: runActionProbe,
+}
 
 /** What `run.ts` calls as `window.bench`. */
 export type Bench = typeof bench

@@ -2,6 +2,8 @@ import type { Computed, Frame } from '@reatom/core'
 import type { reatomConvex as reatomBinding } from 'reatom-convex'
 
 import { context } from '@reatom/core'
+import { ConvexClient as BatchedClient } from 'convex-artifact-batched/browser'
+import { ConvexClient as RewrittenClient } from 'convex-artifact-rewrite/browser'
 import { ConvexClient as PatchedConvexClient } from 'convex-patched/browser'
 import { ConvexClient } from 'convex/browser'
 import { reatomConvex } from 'reatom-convex'
@@ -69,6 +71,9 @@ const sdkModels =
 export const reatomModels = sdkModels(ConvexClient)
 /** The binding over `ConvexClient` with packages/convex-patched applied. */
 export const patchedModels = sdkModels(PatchedConvexClient)
+/** The binding over the fork tarballs in artifacts.lock.json. */
+export const batchedModels = sdkModels(BatchedClient)
+export const rewrittenModels = sdkModels(RewrittenClient)
 
 /** The same API over the client whose state lives in atoms. */
 export function nativeModels({ server }: BenchServer, options: ModelOptions): ReatomModels {

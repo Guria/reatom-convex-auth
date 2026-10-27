@@ -61,6 +61,7 @@ export default defineConfig({
 				test: {
 					name: 'benchmark',
 					include: ['packages/bench/*.test.ts'],
+					exclude: ['packages/bench/*.node.test.ts'],
 					browser: {
 						enabled: true,
 						headless: true,
@@ -73,7 +74,11 @@ export default defineConfig({
 				extends: true,
 				test: {
 					name: 'unit',
-					include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.ts'],
+					include: [
+						'src/**/*.test.{ts,tsx}',
+						'packages/*/src/**/*.test.ts',
+						'packages/bench/*.node.test.ts',
+					],
 					exclude: ['src/**/*.stories.tsx'],
 					testTimeout: testTimeout,
 					hookTimeout: testTimeout,
