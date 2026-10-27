@@ -1,5 +1,4 @@
 entry = [
-	"vite.native.config.ts",
 	"scripts/**/*.ts",
 	"packages/bench/run.ts",
 	"packages/bench/main.tsx",
@@ -26,8 +25,6 @@ ignoreDependencies = [
 	"steiger",
 	"storybook",
 	"zod",
-	# Injected into backend.ts by vite.native.config.ts, not a static root import.
-	"reatom-convex-client",
 	# Bench aliases that packages/bench/artifacts.ts resolves to fork tarballs.
 	"convex-artifact-batched",
 	"convex-artifact-rewrite",
@@ -63,6 +60,15 @@ ignorePatterns = [
 	"src/shared/components/ui/**",
 	"src/shared/styled-system/**",
 	"theme/recipes/**",
+]
+
+# Give the Convex libraries the app's fork of `convex`. Fallow reads pnpm
+# lockfiles, not nub.lock, so it cannot see them applied.
+ignoreDependencyOverrides = [
+	{ package = "@convex-dev/auth>convex" },
+	{ package = "@convex-dev/better-auth>convex" },
+	{ package = "convex-helpers>convex" },
+	{ package = "convex-test>convex" },
 ]
 
 [duplicates]

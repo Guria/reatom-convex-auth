@@ -31,7 +31,7 @@ const NoteList = reatomComponent(({ notes }: Pick<NotesPageModel, 'notes'>) => {
 		)
 	}
 	const status = notes.status()
-	if (status === 'LoadingFirstPage' || status === 'Skipped') {
+	if (status === 'LoadingFirstPage') {
 		return (
 			<styled.div role="status" aria-label={m.notes_loading()} display="grid" gap="2">
 				<Skeleton h="10" />

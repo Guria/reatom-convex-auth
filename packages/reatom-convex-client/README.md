@@ -73,8 +73,8 @@ Implemented and tested against the fake server or a scripted socket:
 - Live pagination, `loadMore`, server-requested page splits, skip, args
   changes, page errors. Preloaded values become live queries.
 
-`mise run convex:smoke:native` and `mise run e2e:real` against `mise run
-dev:native` passed on a local anonymous backend with both auth providers:
+`mise run convex:smoke:native`, and `mise run e2e:real` against the app built
+on this client, passed on a local anonymous backend with both auth providers:
 queries, real JWTs, mutations, load-more, a sign-up action, session restore and
 sign-out.
 

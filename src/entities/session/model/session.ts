@@ -1,5 +1,6 @@
 import {
 	action,
+	atom,
 	computed,
 	effect,
 	reatomEnum,
@@ -41,14 +42,20 @@ const sessionKey = computed(() => {
 
 type SessionStatus = 'signedOut' | 'authenticating' | 'authenticated' | 'rejected'
 
+// The session whose token Convex holds. Until it is the current one, Convex's
+// answer is about an earlier session.
+const convexAuthKey = atom<string | null>(null, 'convexAuthKey')
+
 /**
  * Two-phase session: the auth library holds a session (`sessionUser`), then
  * the Convex backend accepts or rejects its token. Only `authenticated` may
  * render private data.
  */
 export const sessionStatus = computed((): SessionStatus => {
-	if (!sessionUser()) return 'signedOut'
-	const accepted = convex.serverAuthenticated()
+	const key = sessionKey()
+	if (!key) return 'signedOut'
+	if (convexAuthKey() !== key) return 'authenticating'
+	const accepted = convex().isAuthenticated()
 	if (accepted === null) return 'authenticating'
 	return accepted ? 'authenticated' : 'rejected'
 }, 'sessionStatus').extend(
@@ -57,8 +64,10 @@ export const sessionStatus = computed((): SessionStatus => {
 		() =>
 			effect(() => {
 				const adapter = activeAdapter()
-				if (sessionKey()) convex.setAuth(adapter.fetchToken)
-				else convex.clearAuth()
+				const key = sessionKey()
+				if (key) convex().setAuth(adapter.fetchToken)
+				else convex().clearAuth()
+				convexAuthKey.set(key)
 			}, 'sessionStatus.syncConvexAuth').unsubscribe,
 	),
 )

@@ -1,6 +1,5 @@
 import { assert, atom } from '@reatom/core'
-import { ConvexClient } from 'convex/browser'
-import { reatomConvex } from 'reatom-convex'
+import { reatomConvexClient } from 'convex/browser'
 
 import { createBetterAuthClient } from './auth/betterAuth'
 import { createConvexAuthTransport } from './auth/convexAuth'
@@ -12,7 +11,8 @@ const env = (key: 'VITE_CONVEX_URL' | 'VITE_CONVEX_SITE_URL') => {
 	return value
 }
 
-export const convex = reatomConvex(() => new ConvexClient(env('VITE_CONVEX_URL')), 'convex')
+/** The Convex client; its connection and query state are atoms of the current context. */
+export const convex = atom(() => reatomConvexClient(env('VITE_CONVEX_URL')), 'convex')
 
 export const convexAuthTransport = atom(
 	() => createConvexAuthTransport(env('VITE_CONVEX_URL')),

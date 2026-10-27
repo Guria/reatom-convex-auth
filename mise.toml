@@ -147,11 +147,6 @@ arg "[rest]" help="Additional arguments to pass to Vite"
 '''
 run = "nub exec vp dev --port ${usage_port?} ${usage_rest}"
 
-[tasks."dev:native"]
-description = "Run the app with the experimental native Reatom Convex client"
-depends = ["prepare:codegen"]
-run = "nub exec vp dev --config vite.native.config.ts --port 5173"
-
 [tasks."convex:dev"]
 description = "Run the Convex backend and push functions on change (local deployment, no login)"
 run = '''

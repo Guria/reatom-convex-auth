@@ -39,17 +39,16 @@
 		"@convex-dev/auth": "0.0.96",
 		"@convex-dev/better-auth": "0.12.5",
 		"@icons-pack/react-simple-icons": "^13.13.0",
-		"@reatom/core": "^1001.3.0",
-		"@reatom/react": "^1001.0.1",
+		"@reatom/core": "https://pkg.pr.new/@reatom/core@5f42184",
+		"@reatom/react": "https://pkg.pr.new/@reatom/react@5f42184",
 		"better-auth": "1.6.33",
-		"convex": "1.48.0",
+		"convex": "https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz",
 		"idb-keyval": "^6.2.1",
 		"kahraman": "^0.3.0",
 		"lucide-react": "^1.21.0",
 		"msw": "2.15.0",
 		"react": "^19.2.7",
 		"react-dom": "^19.2.7",
-		"reatom-convex": "workspace:*",
 		"zod": "4"
 	},
 	"devDependencies": {
@@ -75,13 +74,18 @@
 		"fallow": "^3.5.1",
 		"msw-storybook-addon": "^3.0.3",
 		"playwright": "^1.61.1",
-		"reatom-convex-client": "workspace:*",
 		"steiger": "^0.6.0",
 		"storybook": "~10.4.6",
 		"typescript": "npm:@typescript/typescript6@^6.0.2",
 		"vite": "^8.2.1",
 		"vite-plus": "^0.2.8",
 		"vitest": "4.1.10"
+	},
+	"overrides": {
+		"@convex-dev/auth>convex": "https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz",
+		"@convex-dev/better-auth>convex": "https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz",
+		"convex-helpers>convex": "https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz",
+		"convex-test>convex": "https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz"
 	},
 	"devEngines": {
 		"packageManager": {

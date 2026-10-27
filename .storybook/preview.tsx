@@ -110,7 +110,7 @@ function ReatomDecorator({
 		const backend = startFakeBackend(authenticated, seedNotes)
 		const client = backend.createClient()
 		const storyFrame = setupStorybookUrl(initialPath, () => {
-			convex.client.set(client)
+			convex.set(client)
 			convexAuthTransport.set(backend.convexAuth)
 			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
 			if (provider) authProvider.set(provider)
@@ -121,7 +121,7 @@ function ReatomDecorator({
 	useEffect(() => {
 		return () => {
 			// The client reconnects on its own until closed.
-			void frame.client.close()
+			void frame.storyFrame.run(() => frame.client.close())
 			frame.backend.server.close()
 			clearAbortErrors()
 			queueMicrotask(clearAbortErrors)
