@@ -161,7 +161,8 @@ fi
 
 [tasks."convex:env"]
 description = "Generate and set the deployment variables both auth providers need"
-run = "nub scripts/convex-env.ts"
+usage = 'flag "--prod" help="Set them on the production deployment"'
+run = "nub scripts/convex-env.ts ${usage_prod:+--prod}"
 
 [tasks."convex:smoke"]
 description = "Sign up with both auth providers against the running Convex backend"

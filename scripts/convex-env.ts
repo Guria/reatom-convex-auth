@@ -17,21 +17,23 @@ import {
 } from 'node:crypto'
 
 const SITE_URL = process.env['SITE_URL'] ?? 'http://localhost:5173'
+// `--prod` targets the production deployment of the configured project.
+const target = process.argv.includes('--prod') ? ['--prod'] : []
 
-const convex = (args: string[], input?: string) =>
-	execFileSync('nub', ['exec', 'convex', ...args], {
+const convexEnv = (args: string[], input?: string) =>
+	execFileSync('nub', ['exec', 'convex', 'env', ...target, ...args], {
 		encoding: 'utf8',
 		input,
 		stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'inherit'],
 	})
 
 const get = (name: string) => {
-	const value = convex(['env', 'get', name]).trim()
+	const value = convexEnv(['get', name]).trim()
 	return value === '' ? null : value
 }
 
 const set = (name: string, value: string) => {
-	convex(['env', 'set', name], value)
+	convexEnv(['set', name], value)
 	console.log(`${name}: set`)
 }
 
