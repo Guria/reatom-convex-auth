@@ -5,6 +5,8 @@ entry = [
 	"packages/bench/main.tsx",
 	"packages/bench/full.ts",
 	"packages/bench/fullMain.ts",
+	# The size build substitutes this module through its Vite resolver.
+	"packages/bench/plainPrSize.ts",
 	"packages/bench/size/*.tsx",
 	"packages/bench/reatomJsxRuntime.ts",
 ]

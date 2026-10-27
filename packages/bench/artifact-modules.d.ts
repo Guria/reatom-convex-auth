@@ -21,23 +21,53 @@ declare module 'convex-artifact-atoms/browser' {
 	) => AtomsClient
 	type Atom<T> = import('@reatom/core').AtomLike<T, []>
 	type Ref = import('convex/server').FunctionReference<any>
+	type PaginatedItem<Query extends Ref> =
+		import('convex/server').FunctionReturnType<Query> extends { page: Array<infer Item> }
+			? Item
+			: never
 	export type AtomsClient = {
 		connectionState: Atom<import('convex/browser').ConnectionState>
 		isAuthenticated: Atom<boolean | null>
 		isRefreshingAuth: Atom<boolean>
-		query(ref: Ref, args?: object): { data: Atom<any> }
-		paginatedQuery(
-			ref: Ref,
-			args: object,
+		query<Query extends import('convex/server').FunctionReference<'query'>>(
+			ref: Query,
+			args?: import('convex/server').FunctionArgs<Query>,
+		): {
+			result: Atom<
+				| { success: true; value: import('convex/server').FunctionReturnType<Query> }
+				| { success: false; errorMessage: string }
+				| undefined
+			>
+			data: Atom<import('convex/server').FunctionReturnType<Query> | undefined>
+			error: Atom<Error | undefined>
+		}
+		paginatedQuery<Query extends import('convex/server').FunctionReference<'query'>>(
+			ref: Query,
+			args: Omit<import('convex/server').FunctionArgs<Query>, 'paginationOpts'>,
 			options: { initialNumItems: number; id?: number },
-		): { results: Atom<any[]>; loadMore: (numItems: number) => boolean }
-		mutation(
-			ref: Ref,
-			args?: object,
+		): {
+			results: Atom<PaginatedItem<Query>[]>
+			state: Atom<{
+				results: PaginatedItem<Query>[]
+				status: import('convex/browser').PaginationStatus
+				error?: Error
+			}>
+			loadMore: (numItems: number) => boolean
+		}
+		mutation<Mutation extends import('convex/server').FunctionReference<'mutation'>>(
+			ref: Mutation,
+			args?: import('convex/server').FunctionArgs<Mutation>,
 			options?: import('convex/browser').MutationOptions,
-		): Promise<any>
-		action(ref: Ref, args?: object): Promise<unknown>
-		setAuth(fetchToken: import('convex/browser').AuthTokenFetcher): void
+		): Promise<import('convex/server').FunctionReturnType<Mutation>>
+		action<Action extends import('convex/server').FunctionReference<'action'>>(
+			ref: Action,
+			args?: import('convex/server').FunctionArgs<Action>,
+		): Promise<import('convex/server').FunctionReturnType<Action>>
+		setAuth(
+			fetchToken: import('convex/browser').AuthTokenFetcher,
+			onChange?: (authenticated: boolean) => void,
+		): void
+		clearAuth(): void
 		close(): Promise<void>
 	}
 }

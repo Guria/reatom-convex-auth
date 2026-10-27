@@ -16,6 +16,7 @@ import { captureBrowserErrors } from './browserDiagnostics'
 import { fullReatom } from './fullBuild'
 import { renderFullReport, renderFullSummary } from './fullReport'
 import { summarizeFull } from './fullStats'
+import { renderPlainReport } from './plainReport'
 
 const { values } = parseArgs({
 	options: {
@@ -23,6 +24,7 @@ const { values } = parseArgs({
 		iterations: { type: 'string', default: '25' },
 		warmup: { type: 'string', default: '5' },
 		write: { type: 'boolean', default: false },
+		plain: { type: 'boolean', default: false },
 	},
 })
 const positive = (value: string, minimum = 1) => {
@@ -37,7 +39,7 @@ const root = path.resolve(import.meta.dirname, '../..')
 const benchDir = import.meta.dirname
 const artifacts = loadArtifacts({ lockFile: path.join(benchDir, 'full.lock.json') })
 const reatom = fullReatom()
-const directory = path.join(root, '.var/bench/full')
+const directory = path.join(root, values.plain ? '.var/bench/plain' : '.var/bench/full')
 mkdirSync(directory, { recursive: true })
 const shapes = ['per-message', 'coalesced'] as const
 export type FullRecord = FullSample & {
@@ -96,6 +98,7 @@ export type FullResult = {
 	memory: MemoryRow[]
 	bundles: BundleRow[]
 	records: FullRecord[]
+	checks?: string[]
 }
 
 const rotate = <T>(list: T[], shift: number) => [
@@ -103,7 +106,7 @@ const rotate = <T>(list: T[], shift: number) => [
 	...list.slice(0, shift % list.length),
 ]
 
-async function bundles(): Promise<BundleRow[]> {
+function sizeRows() {
 	const rows = [
 		{
 			id: 'pr-react',
@@ -142,13 +145,51 @@ async function bundles(): Promise<BundleRow[]> {
 			sdk: 'atoms' as const,
 		},
 	]
+	if (values.plain)
+		rows.push(
+			{
+				id: 'pr-plain',
+				label: 'PR #211 + plain React store',
+				entry: 'plain-react.tsx',
+				sdk: 'batched',
+			},
+			{
+				id: 'native-plain',
+				label: 'Native + plain React store',
+				entry: 'plain-react.tsx',
+				sdk: 'atoms',
+			},
+		)
+	return rows.filter(
+		(row) =>
+			!values.plain || ['pr-react', 'native-react', 'pr-plain', 'native-plain'].includes(row.id),
+	)
+}
+
+async function bundles(): Promise<BundleRow[]> {
 	const output: BundleRow[] = []
-	for (const row of rows) {
+	for (const row of sizeRows()) {
 		const result = await build({
 			configFile: false,
 			root: benchDir,
 			logLevel: 'silent',
-			plugins: [react(), reatom.plugin, artifactPlugin(artifacts, row.sdk)],
+			plugins: [
+				react(),
+				...(row.id === 'pr-plain'
+					? [
+							{
+								name: 'plain-pr-size',
+								enforce: 'pre' as const,
+								resolveId(source: string) {
+									if (source === '../plainClient') return path.join(benchDir, 'plainPrSize.ts')
+									return undefined
+								},
+							},
+						]
+					: []),
+				reatom.plugin,
+				artifactPlugin(artifacts, row.sdk),
+			],
 			build: {
 				write: false,
 				minify: true,
@@ -204,14 +245,25 @@ const records: FullRecord[] = []
 const memory: MemoryRow[] = []
 try {
 	await page.goto(`${server.resolvedUrls!.local[0]}full.html`)
-	const meta = await page.evaluate(() => {
+	const meta = await page.evaluate((plain) => {
 		const b = (window as unknown as { fullBench: FullBench }).fullBench
-		return { modes: b.modes, clients: b.clients, version: b.version, isolated: crossOriginIsolated }
-	})
+		return {
+			modes: plain ? b.plainModes : b.modes,
+			clients: plain ? b.plainClients : b.clients,
+			version: b.version,
+			isolated: crossOriginIsolated,
+		}
+	}, values.plain)
 	if (!meta.isolated) throw new Error('High resolution timers require cross-origin isolation')
 	console.log(
 		`Chromium ${browser.version()}, Reatom ${meta.version}, ${sizes.join('/')} items, ${iterations} measured + ${warmup} warmup`,
 	)
+	const checks = values.plain
+		? await page.evaluate(() =>
+				(window as unknown as { fullBench: FullBench }).fullBench.checkPlainClient(),
+			)
+		: []
+	console.log(`Preflight: ${checks.length} native facade integration groups passed`)
 	for (const shape of shapes)
 		await page.evaluate(
 			(shape) =>
@@ -230,6 +282,7 @@ try {
 					size === 1000 || sizes.length === 1
 						? ['distinctQueries', 'sharedQuery', 'extra', 'optimisticMutation', 'pagination']
 						: ['distinctQueries', 'sharedQuery', 'extra']
+				if (values.plain) scenarios.push('updateBurst')
 				for (const scenario of rotate(scenarios, ordinal)) {
 					for (const mode of rotate([...meta.modes], ordinal)) {
 						if (iterations === 1) console.log(`${mode.id} / ${scenario} / ${shape}`)
@@ -329,6 +382,7 @@ try {
 	}
 	const result: FullResult = {
 		date: new Date().toISOString(),
+		checks,
 		config: { sizes, iterations, warmup },
 		environment: {
 			os: `${os.platform()} ${os.release()}`,
@@ -352,11 +406,12 @@ try {
 	const raw = JSON.stringify(result)
 	writeFileSync(path.join(directory, 'results.json'), raw)
 	if (values.write) {
-		writeFileSync(path.join(benchDir, 'FULL_SAMPLES.json.gz'), gzipSync(raw, { level: 9 }))
-		const report = renderFullReport(result)
-		writeFileSync(path.join(benchDir, 'RESULTS_FULL.md'), report.markdown)
-		writeFileSync(path.join(benchDir, 'RESULTS_FULL.html'), report.html)
-		if (sizes.includes(1000))
+		const name = values.plain ? 'PLAIN' : 'FULL'
+		writeFileSync(path.join(benchDir, `${name}_SAMPLES.json.gz`), gzipSync(raw, { level: 9 }))
+		const report = values.plain ? renderPlainReport(result) : renderFullReport(result)
+		writeFileSync(path.join(benchDir, `RESULTS_${name}.md`), report.markdown)
+		writeFileSync(path.join(benchDir, `RESULTS_${name}.html`), report.html)
+		if (!values.plain && sizes.includes(1000))
 			writeFileSync(path.join(benchDir, 'RESULTS_FULL_SUMMARY.html'), renderFullSummary(result))
 	}
 	console.log(`Saved ${records.length} samples to ${directory}/results.json`)

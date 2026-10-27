@@ -21,6 +21,7 @@ import {
 	officialBatched,
 	officialRewrite,
 } from './official'
+import { plainPr, plainNative } from './plainReact'
 import {
 	reatom,
 	reatomAtoms,
@@ -51,6 +52,8 @@ type Config = {
 type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
 export const allBindings = [
+	plainPr,
+	plainNative,
 	official,
 	officialBatched,
 	officialRewrite,
@@ -192,11 +195,26 @@ const pagination: Scenario = (binding, config) =>
 		return { 'first page': first, 'load more': more }
 	})
 
+const updateBurst: Scenario = (binding, config) =>
+	session(binding, config, async ({ server, instance, container }) => {
+		instance.items(Array.from({ length: config.items }, (_, i) => i))
+		await until(container, { selector: '[data-v="0"]', count: config.items })
+		const result = await measure(
+			container,
+			() => {
+				for (let i = 0; i < 20; i++) server.bump([0])
+			},
+			{ selector: '[data-id="0"][data-v="20"]', count: 1 },
+		)
+		return { '20 transition burst': result }
+	})
+
 const allScenarios: Record<string, Scenario> = {
 	distinctQueries,
 	sharedQuery,
 	optimisticMutation,
 	pagination,
+	updateBurst,
 }
 
 // Without React there are no commits to count.

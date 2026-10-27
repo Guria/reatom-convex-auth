@@ -207,6 +207,16 @@ flag "--write" help="Save the report, HTML and compressed raw samples"
 '''
 run = "nub packages/bench/full.ts --sizes ${usage_sizes?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
 
+[tasks."bench:plain"]
+description = "Compare non-Reatom consumers over native atoms with PR 211 and compatibility controls"
+usage = '''
+flag "--sizes <list>" default="10,100,1000,5000" help="Comma-separated query counts"
+flag "--iterations <n>" default="25" help="Measured iterations per scenario"
+flag "--warmup <n>" default="5" help="Unmeasured iterations per size"
+flag "--write" help="Save the report, HTML and compressed raw samples"
+'''
+run = "nub packages/bench/full.ts --plain --sizes ${usage_sizes?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
+
 [tasks.storybook]
 description = "Start Storybook dev server"
 depends = ["prepare:codegen"]

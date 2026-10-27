@@ -9,6 +9,9 @@ import { makeFunctionReference } from 'convex/server'
 
 import { CLIENT_URL, createBenchServer, until, type Binding } from './fixture'
 import { allBindings, bench, measure, session } from './main'
+import { checkPlainClient } from './plainChecks'
+import { createPlainNativeClient } from './plainClient'
+import { createPlainPrClient } from './plainPrClient'
 
 const modes = [
 	{
@@ -48,14 +51,29 @@ const modes = [
 		pair: 'Reatom + JSX',
 	},
 ] as const
-export type FullMode = (typeof modes)[number]
+export const plainModes = [
+	...modes.slice(0, 2),
+	{
+		id: 'pr-plain',
+		label: 'PR #211 · plain React store',
+		binding: 'PR #211 plain React',
+		pair: 'Plain React',
+	},
+	{
+		id: 'native-plain',
+		label: 'Native atoms · plain React store',
+		binding: 'Native plain React',
+		pair: 'Plain React',
+	},
+] as const
+export type FullMode = (typeof modes)[number] | (typeof plainModes)[number]
 export type FullConfig = {
 	items: number
 	queryResponses: 'per-message' | 'coalesced'
 	batchQuerySet: boolean
 }
 const findBinding = (id: string): Binding => {
-	const mode = modes.find((entry) => entry.id === id)
+	const mode = [...modes, ...plainModes].find((entry) => entry.id === id)
 	const binding = allBindings.find((entry) => entry.label === mode?.binding)
 	if (!binding) throw new Error(`Unknown mode ${id}`)
 	return binding
@@ -88,7 +106,7 @@ async function extraViews(id: string, config: FullConfig) {
 const item = makeFunctionReference<'query', { id: number }, number>('bench:scalar')
 const write = makeFunctionReference<'mutation', { id: number }, number>('bench:write')
 const echo = makeFunctionReference<'action', { id: number }, number>('bench:echo')
-type ClientKind = 'pr-base' | 'native-base' | 'native-atoms'
+type ClientKind = 'pr-base' | 'native-base' | 'native-atoms' | 'pr-plain' | 'native-plain'
 type Watcher = {
 	connected(): boolean
 	watch(id: number, receive: (value: number) => void): () => void
@@ -113,31 +131,46 @@ const optimisticOptions = (
 			}
 		: undefined
 
-function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket): Watcher {
-	if (kind === 'native-atoms') {
-		const frame = context.start()
-		const client = reatomConvexClient(CLIENT_URL, clientOptions(WebSocket))
-		const disconnect = frame.run(() => client.connectionState.subscribe(() => {}))
-		return {
-			connected: () => frame.run(() => client.connectionState().isWebSocketConnected),
-			watch: (id, receive) =>
-				frame.run(() =>
-					client.query(item, { id }).data.subscribe((value: number | undefined) => {
-						if (value !== undefined) receive(value)
-					}),
-				),
-			mutation: (id, optimistic) =>
-				frame.run(() => client.mutation(write, { id }, optimisticOptions(id, optimistic))),
-			action: (id) => frame.run(() => client.action(echo, { id })),
-			close: () =>
-				frame.run(() => {
-					disconnect()
-					return client.close()
-				}),
-		}
+function plainWatcher(
+	factory: typeof createPlainNativeClient | typeof createPlainPrClient,
+	WebSocket: typeof globalThis.WebSocket,
+): Watcher {
+	const client = factory(CLIENT_URL, clientOptions(WebSocket))
+	return {
+		connected: () => client.connection.getSnapshot().isWebSocketConnected,
+		watch: (id, receive) =>
+			client.onUpdate(item, { id }, receive, (error) => {
+				throw error
+			}),
+		mutation: (id, optimistic) => client.mutation(write, { id }, optimisticOptions(id, optimistic)),
+		action: (id) => client.action(echo, { id }),
+		close: client.close,
 	}
+}
+function nativeWatcher(WebSocket: typeof globalThis.WebSocket): Watcher {
+	const frame = context.start()
+	const client = reatomConvexClient(CLIENT_URL, clientOptions(WebSocket))
+	const disconnect = frame.run(() => client.connectionState.subscribe(() => {}))
+	return {
+		connected: () => frame.run(() => client.connectionState().isWebSocketConnected),
+		watch: (id, receive) =>
+			frame.run(() =>
+				client.query(item, { id }).data.subscribe((value: number | undefined) => {
+					if (value !== undefined) receive(value)
+				}),
+			),
+		mutation: (id, optimistic) =>
+			frame.run(() => client.mutation(write, { id }, optimisticOptions(id, optimistic))),
+		action: (id) => frame.run(() => client.action(echo, { id })),
+		close: () =>
+			frame.run(() => {
+				disconnect()
+				return client.close()
+			}),
+	}
+}
+function sdkWatcher(Constructor: typeof Patched, WebSocket: typeof globalThis.WebSocket): Watcher {
 	const listeners = new Map<string, { id: number; callbacks: Set<(value: number) => void> }>()
-	const Constructor = kind === 'pr-base' ? Patched : Rewritten
 	const deliver = (entry: { id: number; callbacks: Set<(value: number) => void> }) => {
 		const value = client.localQueryResult('bench:scalar', { id: entry.id })
 		if (typeof value !== 'number') return
@@ -176,6 +209,16 @@ function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket)
 		close: () => client.close(),
 	}
 }
+
+const watcherFactories: Record<ClientKind, (WebSocket: typeof globalThis.WebSocket) => Watcher> = {
+	'pr-base': (ws) => sdkWatcher(Patched, ws),
+	'native-base': (ws) => sdkWatcher(Rewritten, ws),
+	'native-atoms': nativeWatcher,
+	'pr-plain': (ws) => plainWatcher(createPlainPrClient, ws),
+	'native-plain': (ws) => plainWatcher(createPlainNativeClient, ws),
+}
+const createWatcher = (kind: ClientKind, WebSocket: typeof globalThis.WebSocket) =>
+	watcherFactories[kind](WebSocket)
 
 export type FullSample = {
 	ms: number
@@ -383,8 +426,11 @@ async function reactiveArgs(config: FullConfig) {
 }
 
 const fullBench = {
+	checkPlainClient,
 	version: VERSION,
 	modes,
+	plainModes,
+	plainClients: ['pr-base', 'native-base', 'pr-plain', 'native-plain'] satisfies ClientKind[],
 	clients,
 	runView: (id: string, scenario: string, config: FullConfig) =>
 		scenario === 'extra'

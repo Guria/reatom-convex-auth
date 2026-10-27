@@ -310,3 +310,64 @@ copy is `.var/bench/full/results.json`. Small differences and sub-0.3 ms rows
 are dominated by measurement and scheduling noise. This measures local client
 work, not real network or backend latency, auth/reconnect performance, or full
 behavioral parity.
+
+## Non-Reatom consumers without the compatibility clients
+
+```sh
+mise run bench:plain --write
+```
+
+This uses the same pinned SDKs and preview packages as `bench:full`. It saves
+`RESULTS_PLAIN.md`, `RESULTS_PLAIN.html`, and `PLAIN_SAMPLES.json.gz` separately.
+The scratch build and uncompressed samples are in `.var/bench/plain/`.
+
+`plainClient.ts` is an experimental ordinary-JavaScript API over the native
+client's public atoms. It owns one Reatom frame. Consumers do not import Reatom:
+
+```ts
+const client = createPlainNativeClient(url)
+const stop = client.onUpdate(api.item, { id: 1 }, receive, onError)
+stop()
+await client.close()
+```
+
+React consumers get a normal external store, with no `@reatom/react` provider:
+
+```tsx
+const store = useMemo(() => client.query(api.item, { id }), [client, id])
+const item = useSyncExternalStore(store.subscribe, store.getSnapshot)
+```
+
+The facade subscribes directly to the query result atom. It does not instantiate
+`BaseConvexClient`, `ConvexClient`, or `ConvexReactClient`. The runtime still uses
+Reatom; the consumer API does not. Query errors throw from `getSnapshot` or go
+to `onError` for callback subscribers. Commands and auth are ordinary functions.
+One facade owns one context and closes its external subscriptions explicitly.
+
+The comparison has four React columns, all production builds:
+
+- PR #211 through `convex/react`.
+- The native rewrite through the existing `convex/react` compatibility path.
+- PR #211 through a small token-dispatch external store.
+- The native rewrite through the new plain external store.
+
+The last two use the exact same React components and `useSyncExternalStore`
+hook. Each query starts in the subscription, not during render. Shared queries
+still deduplicate at the client. SDK-only columns compare the two callback
+facades and both `BaseConvexClient` controls. The PR facade uses the existing
+SDK pagination implementation, not a simplified pagination fixture.
+
+The scorecard gives every measured operation a bar and lets you scale any
+operation, not only mount. It includes median, p95, paired-bootstrap intervals,
+heap probes, bundle sizes, sparse/full updates, shared-query fan-out,
+twenty-transition bursts, query churn, concurrent optimistic layers,
+mutations/actions, and first/next pages. There are no real network, auth
+refresh/reconnect performance, or long-lived leak claims.
+
+`plainStore.test.ts` tests ownership and callback delivery. Before timing,
+`plainChecks.ts` exercises the measured native artifact and preview in both
+response shapes: loading, result snapshots, subscribe/unsubscribe, dedupe,
+resubscribe, optimistic confirmation, action results, structured query errors,
+live pagination cleanup, auth/clear, close and use-after-close. This facade is
+not full Convex React parity: SSR snapshots, Suspense, preloading, auth provider
+components, and the legacy public API are outside this prototype.
