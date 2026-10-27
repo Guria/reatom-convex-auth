@@ -56,6 +56,10 @@ if the unpacked JS changes. A Vite plugin resolves `convex-artifact-<id>/*`
 to the unpacked package, and the Reatom build plugin resolves the SDK's own
 `@reatom/core` import, so a page still holds one Reatom copy.
 
+The 19-column run's raw samples, 700 KB of JSON, exceed the commit hook's
+size limit, so only its report is in the repository; `--write` puts the
+JSON next to it.
+
 `--probe-action` runs the same columns on the two `@reatom/core` builds the
 lock's `core` entries pin: the base and head of
 [reatom/reatom#1386](https://github.com/reatom/reatom/pull/1386), which stops

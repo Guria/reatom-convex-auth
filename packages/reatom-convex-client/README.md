@@ -177,54 +177,61 @@ keeps its 8 KiB bundle advantage.
 
 ## The fork builds
 
-Two branches of [Guria/convex-js](https://github.com/Guria/convex-js) build
-`convex@1.48.0` from source:
+Three branches of [Guria/convex-js](https://github.com/Guria/convex-js)
+build `convex@1.48.0` from source:
 
 - `batched-query-set-transitions` ports `convex.patch` to the TypeScript
   sources ("TS patch").
-- `reatom-browser-client` rewrites `convex/browser` on `@reatom/core` and
-  keeps its API, so convex/react and the binding run on it unchanged
-  ("Reatom SDK"). It batches query set edits and applies transitions per
-  query too.
+- `reatom-browser-client` moves the state of each `convex/browser` class
+  into `@reatom/core` and keeps the API ("Reatom SDK").
+- `reatom-native-client` keeps the sync client's state in atoms and exports
+  them as `reatomConvexClient` from `convex/browser` ("Atoms SDK").
+  `BaseConvexClient`, `ConvexClient` and convex/react run on top of it. Its
+  parity tests run each scenario on npm `convex@1.48.0` and on the branch and
+  expect the same trace; `REATOM.md` on the branch lists where it differs on
+  purpose.
 
-From [RESULTS_ARTIFACTS.md](../bench/RESULTS_ARTIFACTS.md), 14 columns in
-one page, medians in ms:
+From [RESULTS_ARTIFACTS.md](../bench/RESULTS_ARTIFACTS.md), 19 columns in
+one page, medians in ms. "Atoms SDK API" reads the Atoms SDK's atoms
+directly, without the binding:
 
-| Scenario, per-message | convex/react | convex/react, TS patch | convex/react, Reatom SDK | binding, JSX, TS patch | binding, JSX, Reatom SDK | native, JSX |
-| --------------------- | -----------: | ---------------------: | -----------------------: | ---------------------: | -----------------------: | ----------: |
-| mount                 |         60.5 |                   9.70 |                     10.5 |                   13.4 |                     15.1 |        10.9 |
-| unmount               |         8.77 |                   1.37 |                     1.58 |                   2.81 |                     2.84 |        1.59 |
-| update all            |         3.56 |                   3.88 |                     4.11 |                   3.44 |                     3.53 |        2.50 |
-| coalesced mount       |         13.8 |                   10.3 |                     11.1 |                   13.5 |                     14.8 |        11.0 |
+| Scenario             | convex/react | convex/react, TS patch | convex/react, Atoms SDK | binding, JSX, TS patch | binding, JSX, Atoms SDK | Atoms SDK API, JSX | native, JSX |
+| -------------------- | -----------: | ---------------------: | ----------------------: | ---------------------: | ----------------------: | -----------------: | ----------: |
+| mount                |         65.5 |                   10.6 |                    14.4 |                   17.4 |                    20.3 |               9.24 |        12.2 |
+| unmount              |         9.87 |                   1.69 |                    2.91 |                   3.03 |                    4.65 |               1.99 |        1.94 |
+| update all           |         4.12 |                   4.34 |                    6.15 |                   4.32 |                    5.16 |               3.15 |        3.13 |
+| coalesced mount      |         14.8 |                   10.4 |                    13.3 |                   15.7 |                    18.7 |               9.77 |        12.5 |
+| coalesced update all |         5.46 |                   4.09 |                    4.95 |                   4.30 |                    4.97 |               3.48 |        3.05 |
 
-The TS patch matches the ESM patch within noise in every row but one:
-@reatom/react shared update, per-message, at 5.99 ms against 3.71, with an
-IQR of 4.25–6.50 and no gap in the coalesced run. The Reatom
-SDK is within noise of the TS patch in most rows. It's slower in two:
-under @reatom/react it updates 1000 queries in 9.31 ms against 7.14
-(coalesced 10.5 against 7.59), and under @reatom/jsx it mounts them about 1.5 ms slower in both
-response shapes (15.1 against 13.4, coalesced 14.8 against 13.5), with
-overlapping IQRs. It also adds 4.6 KiB gzip to the convex/react app, which
-now ships Reatom. In the binding apps, which ship Reatom anyway, it costs
-0.3 KiB more than the TS patch.
+- Read directly, the Atoms SDK is as fast as native: under @reatom/jsx it
+  mounts 1000 queries in 9.24 ms against 12.2 and matches native on update
+  all and unmount (unmount IQRs 1.75–2.34 and 1.55–2.30). Under
+  @reatom/react it mounts in 20.4 ms against 25.3.
+- Through its compat classes it is slower than the TS patch: convex/react
+  mounts in 14.4 ms against 10.6 and unmounts in 2.91 against 1.69, with IQRs
+  apart. That is still 4.5× faster than stock on mount. Each query is an atom,
+  so the SDK API pays an atom per subscription and a write per update.
+- The Reatom SDK stays within about 1 ms of the TS patch under convex/react
+  and @reatom/jsx. Under @reatom/react it updates 1000 queries in 12.7 ms
+  against 10.0.
+- Bundle, gzip over each app's baseline: the Atoms SDK API app adds 16.9 KiB
+  under @reatom/jsx, native 15.2, the binding on the Atoms SDK 23.2. The
+  convex/react app on the Atoms SDK adds 25.9 KiB against 20.9 stock, since it
+  ships Reatom.
 
 ## Verdict
 
-Not worth pursuing as a replacement for the binding. The patched SDK gets
-convex/react to 0.17× of its stock mount time and the binding to within
-2 ms of native, by changing two methods of `BaseConvexClient`. Native's
-remaining edge is 8 KiB of bundle and a couple of milliseconds per 1000
-subscriptions. In exchange the app would own reconnect, auth races and
-pagination splits that the SDK ships with each Convex release. The
-real-backend smoke test already caught one pagination bug the fake server
-had missed: loaded cursors survived a user switch.
+For convex/react apps, propose the `batched-query-set-transitions` branch
+upstream. Two methods of `BaseConvexClient` take convex/react to 0.16× of its
+stock mount time, and neither rewrite on Reatom beats that through the SDK
+API.
 
-Rewriting `convex/browser` on Reatom doesn't change that. With its API
-kept, it runs as fast as the two-method patch at best, and it makes Reatom
-a dependency of every convex/react app.
-
-Propose the `batched-query-set-transitions` branch upstream and keep the
-binding.
+For Reatom apps, the Atoms SDK reads as fast as the native client, and its
+parity with `convex@1.48.0` is tested, which native's is not. It replaces
+native if depending on a fork of `convex` and a Reatom preview build is
+acceptable. If not, keep the binding on the patched SDK: under @reatom/jsx
+it stays 1.1–5.2 ms behind native per 1000 subscriptions, and there is no
+protocol code to own.
 
 ## Reproduce
 
