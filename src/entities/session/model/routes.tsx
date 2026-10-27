@@ -15,8 +15,11 @@ export const protectedRoute = rootRoute.reatomRoute(
 			const status = sessionStatus()
 			if (status === 'authenticated') return {}
 			// While the backend checks the token, the app shows a session status.
-			if (status !== 'authenticating' && urlAtom().pathname !== loginPath) {
-				urlAtom.go(loginPath, true)
+			// The query survives: an auth library's redirect back may land on
+			// `/login/` with its params.
+			const { pathname, search } = urlAtom()
+			if (status !== 'authenticating' && pathname !== loginPath) {
+				urlAtom.go(loginPath + search, true)
 			}
 			return null
 		},

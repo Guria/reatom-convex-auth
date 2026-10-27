@@ -115,9 +115,12 @@ function ReatomDecorator({
 			convex.set(client)
 			convexAuthTransport.set(backend.convexAuth)
 			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
-			// Leaving for GitHub comes straight back, as if the user approved.
+			// Leaving for GitHub comes straight back, as if the user approved, to
+			// `/login/`: GitHub Pages answers `/login` with a 301 that adds the slash.
 			assignLocation.set(() => (url: string) => {
-				urlAtom.set(new URL(backend.approveGitHubSignIn(url)))
+				const landing = new URL(backend.approveGitHubSignIn(url))
+				landing.pathname += '/'
+				urlAtom.set(landing)
 			})
 			if (provider) authProvider.set(provider)
 		})
