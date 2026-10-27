@@ -14,14 +14,30 @@ import {
 	type Binding,
 	type Handle,
 } from './fixture'
-import { official, officialPatched, officialBatched, officialRewrite } from './official'
-import { reatom, reatomNative, reatomPatched, reatomBatched, reatomRewrite } from './reatom'
+import {
+	official,
+	officialAtoms,
+	officialPatched,
+	officialBatched,
+	officialRewrite,
+} from './official'
+import {
+	reatom,
+	reatomAtoms,
+	reatomAtomsApi,
+	reatomNative,
+	reatomPatched,
+	reatomBatched,
+	reatomRewrite,
+} from './reatom'
 import {
 	reatomJsx,
 	reatomJsxNative,
 	reatomJsxPatched,
 	reatomJsxBatched,
 	reatomJsxRewrite,
+	reatomJsxAtoms,
+	reatomJsxAtomsApi,
 } from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
@@ -38,6 +54,11 @@ const allBindings = [
 	official,
 	officialBatched,
 	officialRewrite,
+	officialAtoms,
+	reatomAtoms,
+	reatomAtomsApi,
+	reatomJsxAtoms,
+	reatomJsxAtomsApi,
 	reatomBatched,
 	reatomRewrite,
 	reatomJsxBatched,

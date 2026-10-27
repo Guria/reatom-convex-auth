@@ -17,10 +17,10 @@ const artifactSchema = z.object({
 	archive: z.string(),
 	sha256: z.string().regex(/^[a-f0-9]{64}$/),
 })
-const sdkSchema = artifactSchema.extend({ id: z.enum(['batched', 'rewrite']) })
+const sdkSchema = artifactSchema.extend({ id: z.enum(['batched', 'rewrite', 'atoms']) })
 const coreSchema = artifactSchema.extend({ id: z.enum(['action-base', 'action-patch']) })
 const lockSchema = z.object({
-	convex: z.array(sdkSchema).length(2),
+	convex: z.array(sdkSchema).min(2),
 	core: z.array(coreSchema).length(2).optional(),
 })
 const packageSchema = z.object({
@@ -78,7 +78,7 @@ const verifyPackage = (target: string, packageName: keyof typeof EXPECTED_VERSIO
 	)
 	if (pkg.name !== packageName || pkg.version !== EXPECTED_VERSION[packageName])
 		throw new Error(`Unexpected artifact package ${pkg.name}@${pkg.version}`)
-	if (id === 'rewrite' && !pkg.dependencies?.['@reatom/core'])
+	if ((id === 'rewrite' || id === 'atoms') && !pkg.dependencies?.['@reatom/core'])
 		throw new Error('Reatom SDK artifact lacks its runtime dependency')
 }
 
@@ -106,7 +106,7 @@ export function loadArtifacts({
 	lockFile = path.join(import.meta.dirname, 'artifacts.lock.json'),
 } = {}): SdkArtifact[] {
 	const lock = lockSchema.parse(JSON.parse(readFileSync(lockFile, 'utf8')))
-	if (new Set(lock.convex.map(({ id }) => id)).size !== 2)
+	if (new Set(lock.convex.map(({ id }) => id)).size !== lock.convex.length)
 		throw new Error('Duplicate SDK artifact id')
 	return lock.convex.map((artifact) => readArtifact(artifact, workspace, 'convex', 'dist/esm'))
 }
@@ -122,7 +122,7 @@ export function loadCoreArtifacts(): CoreArtifact[] {
 
 /** `convex-artifact-<id>/x` names artifact `<id>`; with an override, so does any `convex/x`. */
 const artifactImport = (source: string, override?: string) => {
-	const match = /^convex-artifact-(batched|rewrite)(\/.*|)$/.exec(source)
+	const match = /^convex-artifact-(batched|rewrite|atoms)(\/.*|)$/.exec(source)
 	if (match) return { id: match[1]!, suffix: match[2]! }
 	if (override && /^convex(?:\/|$)/.test(source))
 		return { id: override, suffix: source.slice('convex'.length) }

@@ -232,7 +232,12 @@ const artifactColumns = () =>
 				{ label: `${binding} ESM patch`, binding: `${binding} patched` },
 				{ label: `${binding} TS patch`, binding: `${binding} TS patch` },
 				{ label: `${binding} Reatom SDK`, binding: `${binding} Reatom SDK` },
+				{ label: `${binding} Atoms SDK`, binding: `${binding} Atoms SDK` },
 			]),
+			...['@reatom/react', '@reatom/jsx'].map((binding) => ({
+				label: `${binding} Atoms SDK API`,
+				binding: `${binding} Atoms SDK API`,
+			})),
 			...['@reatom/react', '@reatom/jsx'].map((binding) => ({
 				label: `${binding} native`,
 				binding: `${binding} native`,
@@ -617,6 +622,24 @@ async function sizes() {
 							artifact: id,
 							baseline: `Reatom + @reatom/jsx ${reatom.name}`,
 						},
+						...(id === 'atoms'
+							? [
+									{
+										label: `${label} API + @reatom/react app ${reatom.name}`,
+										entry: 'atoms-api.tsx',
+										reatom,
+										artifact: id,
+										baseline: `React + Reatom ${reatom.name}`,
+									},
+									{
+										label: `${label} API + @reatom/jsx app ${reatom.name}`,
+										entry: 'atoms-api-jsx.tsx',
+										reatom,
+										artifact: id,
+										baseline: `Reatom + @reatom/jsx ${reatom.name}`,
+									},
+								]
+							: []),
 					]),
 				)
 			: []),

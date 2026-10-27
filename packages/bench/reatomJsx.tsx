@@ -7,6 +7,8 @@ import { mount } from '@reatom/jsx'
 
 import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
 import {
+	atomsApiModels,
+	atomsModels,
 	batchedModels,
 	rewrittenModels,
 	nativeModels,
@@ -87,3 +89,5 @@ export const reatomJsxPatched = jsxBinding('@reatom/jsx patched', patchedModels)
 
 export const reatomJsxBatched = jsxBinding('@reatom/jsx TS patch', batchedModels)
 export const reatomJsxRewrite = jsxBinding('@reatom/jsx Reatom SDK', rewrittenModels)
+export const reatomJsxAtoms = jsxBinding('@reatom/jsx Atoms SDK', atomsModels)
+export const reatomJsxAtomsApi = jsxBinding('@reatom/jsx Atoms SDK API', atomsApiModels)

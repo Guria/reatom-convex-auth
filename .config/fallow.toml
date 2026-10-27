@@ -27,6 +27,7 @@ ignoreDependencies = [
 	# Bench aliases that packages/bench/artifacts.ts resolves to fork tarballs.
 	"convex-artifact-batched",
 	"convex-artifact-rewrite",
+	"convex-artifact-atoms",
 ]
 
 # The skeleton keeps these shared extension points even when its starter screens do not

@@ -44,15 +44,17 @@ SHA-256, in [RESULTS_ARTIFACTS.md](RESULTS_ARTIFACTS.md):
   `packages/convex-patched` ported to the SDK sources.
 - Reatom SDK: branch `reatom-browser-client`, `convex/browser` rewritten on
   `@reatom/core` with its API unchanged.
+- Atoms SDK: branch `reatom-native-client`, the sync client's state in atoms,
+  exported as `reatomConvexClient`, with the SDK API on top.
 
 convex/react, the binding under both renderers, and the native client run
-on each SDK, 14 columns in one page. Copy each tarball (`npm pack` in the
-fork) to the lock's `archive` path. `artifacts.ts` checks its SHA-256,
-unpacks it once under `.var/bench/artifacts/<sha256>`, and fails if the
-unpacked JS changes. A Vite plugin resolves `convex-artifact-batched/*` and
-`convex-artifact-rewrite/*` to the unpacked package, and the Reatom build
-plugin resolves the rewrite's own `@reatom/core` import, so a page still
-holds one Reatom copy.
+on each SDK; the Atoms SDK also runs straight through its atoms under both
+renderers ("Atoms SDK API"), 19 columns in one page. Copy each tarball
+(`npm pack` in the fork) to the lock's `archive` path. `artifacts.ts` checks
+its SHA-256, unpacks it once under `.var/bench/artifacts/<sha256>`, and fails
+if the unpacked JS changes. A Vite plugin resolves `convex-artifact-<id>/*`
+to the unpacked package, and the Reatom build plugin resolves the SDK's own
+`@reatom/core` import, so a page still holds one Reatom copy.
 
 `--probe-action` runs the same columns on the two `@reatom/core` builds the
 lock's `core` entries pin: the base and head of

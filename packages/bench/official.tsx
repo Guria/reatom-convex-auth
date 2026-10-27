@@ -1,3 +1,4 @@
+import * as atoms from 'convex-artifact-atoms/react'
 import * as batched from 'convex-artifact-batched/react'
 import * as rewrite from 'convex-artifact-rewrite/react'
 import * as patched from 'convex-patched/react'
@@ -77,3 +78,4 @@ export const officialPatched = officialBinding('convex/react patched', patched)
 /** convex/react from the Guria/convex-js fork tarballs in artifacts.lock.json. */
 export const officialBatched = officialBinding('convex/react TS patch', batched)
 export const officialRewrite = officialBinding('convex/react Reatom SDK', rewrite)
+export const officialAtoms = officialBinding('convex/react Atoms SDK', atoms)

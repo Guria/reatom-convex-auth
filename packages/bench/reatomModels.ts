@@ -2,6 +2,10 @@ import type { Computed, Frame } from '@reatom/core'
 import type { reatomConvex as reatomBinding } from 'reatom-convex'
 
 import { context } from '@reatom/core'
+import {
+	ConvexClient as AtomsClient,
+	reatomConvexClient as reatomAtomsClient,
+} from 'convex-artifact-atoms/browser'
 import { ConvexClient as BatchedClient } from 'convex-artifact-batched/browser'
 import { ConvexClient as RewrittenClient } from 'convex-artifact-rewrite/browser'
 import { ConvexClient as PatchedConvexClient } from 'convex-patched/browser'
@@ -74,6 +78,40 @@ export const patchedModels = sdkModels(PatchedConvexClient)
 /** The binding over the fork tarballs in artifacts.lock.json. */
 export const batchedModels = sdkModels(BatchedClient)
 export const rewrittenModels = sdkModels(RewrittenClient)
+export const atomsModels = sdkModels(AtomsClient)
+
+/** The same API straight over the Atoms SDK's Reatom client, no binding. */
+export function atomsApiModels({ server }: BenchServer): ReatomModels {
+	const convex = reatomAtomsClient(CLIENT_URL, {
+		webSocketConstructor: server.WebSocket,
+		skipConvexDeploymentUrlCheck: true,
+		unsavedChangesWarning: false,
+	})
+	const frame = context.start()
+	// Connects now, as `new ConvexClient` does.
+	const unsubscribe = frame.run(() => convex.connectionState.subscribe(() => {}))
+	return {
+		frame,
+		connected: () => frame.run(() => convex.connectionState().isWebSocketConnected),
+		item: (id) => frame.run(() => convex.query(api.item, { id })) as ItemModel,
+		list(handle) {
+			const notes = frame.run(() => convex.query(api.list, {}))
+			handle.add = (text) =>
+				frame.run(() => convex.mutation(api.add, { text }, { optimisticUpdate: addNoteFirst }))
+			return () => notes.data() ?? []
+		},
+		pages(initialNumItems, handle) {
+			const pages = frame.run(() => convex.paginatedQuery(api.page, {}, { initialNumItems }))
+			handle.loadMore = (numItems) => frame.run(() => pages.loadMore(numItems))
+			return pages.results
+		},
+		close: () =>
+			frame.run(() => {
+				unsubscribe()
+				return convex.close()
+			}),
+	}
+}
 
 /** The same API over the client whose state lives in atoms. */
 export function nativeModels({ server }: BenchServer, options: ModelOptions): ReatomModels {

@@ -17,6 +17,15 @@
 			"commit": "0e474ba41b1f9fc9806f785f33bfa20d4d1fe811",
 			"archive": ".var/bench/artifacts/incoming/convex-reatom-0e474ba.tgz",
 			"sha256": "922568d9bfd560fab7736e7bac623b70daad9611e63451c220c0945d50e8a5e3"
+		},
+		{
+			"id": "atoms",
+			"label": "Atoms SDK",
+			"threadId": "mcp:b2fc140e-36c7-4866-88c4-484dda88313c",
+			"repository": "Guria/convex-js",
+			"commit": "a5c9bed352f4a3bcaa302dad59c82c4f3e0bf6dc",
+			"archive": ".var/bench/artifacts/incoming/convex-atoms-a5c9bed.tgz",
+			"sha256": "913a7ec2201662ae86b9b5a578e2d3ed26e491e773cb9276711d66b19f5d5146"
 		}
 	],
 	"core": [
