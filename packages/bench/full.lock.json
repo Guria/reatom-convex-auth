@@ -1,0 +1,22 @@
+{
+	"convex": [
+		{
+			"id": "batched",
+			"label": "Convex PR #211",
+			"threadId": "mcp:b2fc140e-36c7-4866-88c4-484dda88313c",
+			"repository": "Guria/convex-js",
+			"commit": "a5dce54dd45fc3256fdccbf59d95f1c9e63d7e4b",
+			"archive": ".var/bench/artifacts/incoming/convex-pr211-a5dce54.tgz",
+			"sha256": "db1f2d77037dd9e890aed5ee3b4497c3117c630b09f063602b1327559583f980"
+		},
+		{
+			"id": "atoms",
+			"label": "Reatom-native rewrite",
+			"threadId": "mcp:b2fc140e-36c7-4866-88c4-484dda88313c",
+			"repository": "Guria/convex-js",
+			"commit": "9257e2f3c993b7d4911b1cfa45d201f02da2dbef",
+			"archive": ".var/bench/artifacts/incoming/convex-native-9257e2f.tgz",
+			"sha256": "29f16074c6ef857213430c5effe676dc6a127d03e81a877150036b1ddac74d7c"
+		}
+	]
+}

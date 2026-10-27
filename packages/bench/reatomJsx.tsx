@@ -45,6 +45,7 @@ const jsxBinding = (
 		let unmount: (() => void) | undefined
 		const show = (build: () => Element) =>
 			models.frame.run(() => {
+				unmount?.()
 				unmount = mount(container, <div>{build()}</div>).unmount
 			})
 		const clear = () => {

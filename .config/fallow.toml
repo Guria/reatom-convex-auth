@@ -3,6 +3,8 @@ entry = [
 	"scripts/**/*.ts",
 	"packages/bench/run.ts",
 	"packages/bench/main.tsx",
+	"packages/bench/full.ts",
+	"packages/bench/fullMain.ts",
 	"packages/bench/size/*.tsx",
 	"packages/bench/reatomJsxRuntime.ts",
 ]

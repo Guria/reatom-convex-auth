@@ -50,7 +50,7 @@ type Config = {
 }
 type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
-const allBindings = [
+export const allBindings = [
 	official,
 	officialBatched,
 	officialRewrite,
@@ -74,7 +74,11 @@ const allBindings = [
 
 const settle = (server: BenchServer) => server.server.settled()
 
-async function session<T>(binding: Binding, config: Config, run: (ctx: Context) => Promise<T>) {
+export async function session<T>(
+	binding: Binding,
+	config: Config,
+	run: (ctx: Context) => Promise<T>,
+) {
 	const server = createBenchServer(config.queryResponses)
 	// @reatom/jsx observes the container's parent, so it is attached first.
 	const container = document.createElement('div')
@@ -87,6 +91,11 @@ async function session<T>(binding: Binding, config: Config, run: (ctx: Context) 
 			await settle(server)
 		}
 		return await run({ server, instance, container })
+	} catch (error) {
+		throw new Error(
+			`${binding.label}: ${String(error)}; traffic ${JSON.stringify(server.server.traffic())}; DOM ${container.innerHTML.slice(0, 600)}`,
+			{ cause: error },
+		)
 	} finally {
 		await instance.close()
 		container.remove()
@@ -97,7 +106,7 @@ async function session<T>(binding: Binding, config: Config, run: (ctx: Context) 
 type Context = { server: BenchServer; instance: BenchInstance; container: HTMLElement }
 
 /** Times `act` until `done`, counting renders and commits. */
-async function measure(
+export async function measure(
 	container: Element,
 	act: () => void,
 	done: Parameters<typeof until>[1],
@@ -205,7 +214,7 @@ async function runOnce(label: string, scenario: string, config: Config) {
 	)
 }
 
-const bench = {
+export const bench = {
 	version: VERSION,
 	scenarios: Object.keys(allScenarios),
 	run: runOnce,

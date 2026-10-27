@@ -36,6 +36,7 @@ declare module 'convex-artifact-atoms/browser' {
 			args?: object,
 			options?: import('convex/browser').MutationOptions,
 		): Promise<any>
+		action(ref: Ref, args?: object): Promise<unknown>
 		setAuth(fetchToken: import('convex/browser').AuthTokenFetcher): void
 		close(): Promise<void>
 	}

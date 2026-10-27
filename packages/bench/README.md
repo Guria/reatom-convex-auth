@@ -246,3 +246,63 @@ paginated lists an app usually has.
   which keeps pages in React state. The binding uses the core paginated query
   client, the same one `usePaginatedQuery_experimental` uses.
 - Below 0.3 ms, scheduling and harness overhead dominate.
+
+## PR #211 against the native rewrite
+
+```sh
+mise run bench:full --write
+# Short correctness run, not enough samples for conclusions:
+mise run bench:full --sizes 10 --iterations 1 --warmup 0
+```
+
+This focused suite uses `full.lock.json`, not the older artifact lock. Its two
+SDKs are PR #211 at `a5dce54` and the native rewrite at `9257e2f`. Each comes
+from a fresh `npm pack` of the exact Git revision. Pack inside the source
+folder, then move the tarball: the SDK's postpack audit rejects
+`--pack-destination`. The two SHA-256 checks run before any browser build.
+Rebuilding a tarball can change its archive hash; retain the measured tarballs
+or explicitly repin after checking the source revision.
+
+The preview packages live in `.var/bench/preview`, outside the app's dependency
+graph. To install the exact byte-pinned preview dependencies:
+
+```sh
+mkdir -p .var/bench/preview
+cp packages/bench/preview.lock.json .var/bench/preview/package-lock.json
+node --input-type=module -e '
+import fs from "node:fs";
+const lock = JSON.parse(fs.readFileSync("packages/bench/preview.lock.json"));
+fs.writeFileSync(".var/bench/preview/package.json", JSON.stringify({private:true,type:"module",dependencies:lock.packages[""].dependencies}));
+'
+npm ci --prefix .var/bench/preview --ignore-scripts --no-audit --no-fund
+```
+
+All Reatom packages use the v1001 preview at `5f42184`. The resolver also pins
+React and React DOM to the app's copies, rather than using the preview
+installation's peer dependencies. The production benchmark does not use the
+React profiling build. Render counts are still recorded; commit counts are
+not instrumented.
+
+Six UI paths separate the client from the renderer. PR #211 runs through
+`convex/react` and through the existing Reatom binding under React and JSX.
+The rewrite runs through unchanged `convex/react` and through its own query
+atoms under the two Reatom renderers. The client-only paths compare both
+`BaseConvexClient` implementations with the same token dispatcher, plus direct
+atom subscriptions without a UI.
+
+The default suite measures distinct and shared queries, full and sparse updates,
+replacement of 10% of the IDs, subscription teardown, twenty separate
+transitions, ten concurrent optimistic layers, 100 mutations, 100 actions,
+and first/next pages. JSX rebuilds the item view on ID replacement; React
+reconciles it. Both paths must render every new result and leave exactly N
+server subscriptions. Query-set traffic and shared-query deduplication have
+assertions, not only timers.
+
+`RESULTS_FULL.md` has median, IQR and descriptive p95 values at every scale.
+`RESULTS_FULL.html` lets you switch consumer path, N and response shape.
+`FULL_SAMPLES.json.gz` contains the raw samples, paired bootstrap intervals,
+three-repeat heap probes, bundle sizes and exact build hashes. The uncompressed
+copy is `.var/bench/full/results.json`. Small differences and sub-0.3 ms rows
+are dominated by measurement and scheduling noise. This measures local client
+work, not real network or backend latency, auth/reconnect performance, or full
+behavioral parity.
