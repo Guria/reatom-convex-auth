@@ -50,11 +50,16 @@ jobs:
         env:
           VITE_CONVEX_URL: https://quirky-buffalo-548.convex.cloud
           VITE_CONVEX_SITE_URL: https://quirky-buffalo-548.convex.site
-          VITE_ENABLE_MSW: 'false'
 
-      # Pages has no rewrites: deep links get 404.html, which boots the app too.
-      - name: Add SPA fallback
-        run: cp .var/pages/index.html .var/pages/404.html
+      # Pages has no rewrites. Each route gets the app shell; other paths get
+      # 404.html, which boots the app too.
+      - name: Add route entry points
+        run: |
+          for route in login dashboard notes; do
+            mkdir -p ".var/pages/$route"
+            cp .var/pages/index.html ".var/pages/$route/index.html"
+          done
+          cp .var/pages/index.html .var/pages/404.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
