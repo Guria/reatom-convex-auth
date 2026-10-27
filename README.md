@@ -109,12 +109,30 @@ nub exec convex deploy
 SITE_URL=https://guria.github.io mise run convex:env --prod
 ```
 
+Production's GitHub OAuth app has the callback URL
+`https://quirky-buffalo-548.convex.site/api`. Its credentials are set with the
+commands from [Auth providers](#auth-providers) plus `--prod`.
+
 ## Auth providers
 
 The sign-in page has an "Auth provider" radio group: Convex Auth
 (`@convex-dev/auth`, Password) or Better Auth (`@convex-dev/better-auth`, email
 and password). The choice lives in localStorage and stays fixed while signed
 in. Each provider has its own accounts, so the same email can exist twice.
+
+"Continue with GitHub" signs in through the selected provider. Both libraries
+share one GitHub OAuth app whose callback URL is the deployment's
+`CONVEX_SITE_URL` plus `/api`. GitHub accepts any redirect under it, so it
+covers `/api/auth/callback/github` and `/api/better-auth/callback/github`.
+GitHub sends the browser back to `/login` with `?code=` (Convex Auth) or
+`?ott=` (better-auth), and `src/entities/session` trades that for a session.
+Each deployment needs the app's credentials, and a local one its own OAuth app
+with the callback URL `http://127.0.0.1:3211/api`:
+
+```bash
+nub exec convex env set AUTH_GITHUB_ID <client id>
+nub exec convex env set AUTH_GITHUB_SECRET  # reads the secret from stdin
+```
 
 Both providers run on one deployment. Each library sits behind an adapter in
 `src/shared/api/auth/` that exposes a session atom, sign-in/up/out, and a token

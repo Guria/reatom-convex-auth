@@ -3,6 +3,7 @@ import '../src/setup'
 
 import '../src/index.css'
 
+import { urlAtom } from '@reatom/core'
 import { reatomContext } from '@reatom/react'
 import addonA11y from '@storybook/addon-a11y'
 import { definePreview } from '@storybook/react-vite'
@@ -17,6 +18,7 @@ import { useEffect, useMemo, type PropsWithChildren } from 'react'
 import { handlersArray } from '#app/mocks/handlers'
 import { authProvider } from '#entities/session'
 import {
+	assignLocation,
 	betterAuthClient,
 	convex,
 	type AuthProviderId,
@@ -113,6 +115,10 @@ function ReatomDecorator({
 			convex.set(client)
 			convexAuthTransport.set(backend.convexAuth)
 			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
+			// Leaving for GitHub comes straight back, as if the user approved.
+			assignLocation.set(() => (url: string) => {
+				urlAtom.set(new URL(backend.approveGitHubSignIn(url)))
+			})
 			if (provider) authProvider.set(provider)
 		})
 		return { storyFrame, client, backend }

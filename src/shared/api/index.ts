@@ -92,4 +92,4 @@ export {
 	reatomConvexAuthAdapter,
 	type ConvexAuthTransport,
 } from './auth/convexAuth'
-export { betterAuthClient, convex, convexAuthTransport } from './backend'
+export { assignLocation, betterAuthClient, convex, convexAuthTransport } from './backend'

@@ -1,15 +1,19 @@
 import {
+	abortVar,
 	action,
 	atom,
 	computed,
 	effect,
 	reatomEnum,
+	urlAtom,
+	withAsync,
 	withConnectHook,
 	withLocalStorage,
 	wrap,
 } from '@reatom/core'
 
 import {
+	assignLocation,
 	AUTH_PROVIDERS,
 	betterAuthClient,
 	convex,
@@ -20,6 +24,7 @@ import {
 	type AuthProviderId,
 	type Credentials,
 } from '#shared/api'
+import { createAppPath } from '#shared/router'
 
 const adapters = {
 	'convex-auth': reatomConvexAuthAdapter(convexAuthTransport, 'convexAuth'),
@@ -40,6 +45,11 @@ const sessionKey = computed(() => {
 	return user ? `${activeAdapter().id}:${user.email}` : null
 }, 'sessionKey')
 
+/** Trades the params the auth library sent the browser back with for a session. */
+export const completeRedirect = action(async (adapter: AuthAdapter, params: URLSearchParams) => {
+	await wrap(adapter.completeRedirect(params))
+}, 'session.completeRedirect').extend(withAsync())
+
 type SessionStatus = 'signedOut' | 'authenticating' | 'authenticated' | 'rejected'
 
 // The session whose token Convex holds. Until it is the current one, Convex's
@@ -52,6 +62,7 @@ const convexAuthKey = atom<string | null>(null, 'convexAuthKey')
  * render private data.
  */
 export const sessionStatus = computed((): SessionStatus => {
+	if (!completeRedirect.ready()) return 'authenticating'
 	const key = sessionKey()
 	if (!key) return 'signedOut'
 	if (convexAuthKey() !== key) return 'authenticating'
@@ -70,6 +81,25 @@ export const sessionStatus = computed((): SessionStatus => {
 				convexAuthKey.set(key)
 			}, 'sessionStatus.syncConvexAuth').unsubscribe,
 	),
+	// Takes the redirect params off the URL. The exchange is spawned, so the
+	// effect rerunning on that URL change does not abort it.
+	withConnectHook(
+		() =>
+			effect(() => {
+				const adapter = activeAdapter()
+				const url = urlAtom()
+				const params = new URLSearchParams()
+				for (const name of adapter.redirectParams) {
+					const value = url.searchParams.get(name)
+					if (value !== null) params.set(name, value)
+				}
+				if (params.size === 0) return
+				const next = new URL(url)
+				for (const name of adapter.redirectParams) next.searchParams.delete(name)
+				abortVar.spawn(() => completeRedirect(adapter, params))
+				urlAtom.set(next, true)
+			}, 'sessionStatus.completeRedirect').unsubscribe,
+	),
 )
 
 export const signIn = action(async (credentials: Credentials) => {
@@ -79,6 +109,12 @@ export const signIn = action(async (credentials: Credentials) => {
 export const signUp = action(async (credentials: Credentials) => {
 	await wrap(activeAdapter().signUp(credentials))
 }, 'session.signUp')
+
+export const signInWithGitHub = action(async () => {
+	const returnTo = new URL(createAppPath('login'), window.location.origin).href
+	const url = await wrap(activeAdapter().startGitHubSignIn(returnTo))
+	assignLocation()(url)
+}, 'session.signInWithGitHub').extend(withAsync())
 
 export const signOut = action(async () => {
 	await wrap(activeAdapter().signOut())

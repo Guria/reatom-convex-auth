@@ -11,7 +11,9 @@ import { BETTER_AUTH_BASE_PATH } from '#convex/authPaths'
  * The client itself is a Proxy that answers every property, `then` included,
  * with a request function, so it must not be stored in an atom as-is. The
  * Convex site is another origin: `crossDomainClient` keeps the session cookie
- * in localStorage and sends it as the `Better-Auth-Cookie` header.
+ * in localStorage and sends it as the `Better-Auth-Cookie` header. After
+ * OAuth, the backend sends the browser back with a one-time token (`ott`)
+ * that the client trades for that cookie.
  */
 export const createBetterAuthClient = (siteUrl: string) => {
 	const client = createAuthClient({
@@ -25,6 +27,14 @@ export const createBetterAuthClient = (siteUrl: string) => {
 		convexToken: () => client.convex.token({ fetchOptions: { throw: false } }),
 		signIn: (credentials: Credentials) => client.signIn.email(credentials),
 		signUp: (credentials: Credentials & { name: string }) => client.signUp.email(credentials),
+		signInWithGitHub: (returnTo: string) =>
+			client.signIn.social({
+				provider: 'github',
+				callbackURL: returnTo,
+				errorCallbackURL: returnTo,
+				disableRedirect: true,
+			}),
+		verifyOneTimeToken: (token: string) => client.crossDomain.oneTimeToken.verify({ token }),
 		signOut: () => client.signOut(),
 	}
 }
@@ -79,11 +89,37 @@ export const reatomBetterAuthAdapter = (
 		user.set(toUser(data))
 	}, `${name}.signUp`)
 
+	const startGitHubSignIn = action(async (returnTo: string) => {
+		const { data, error } = await wrap(client().signInWithGitHub(returnTo))
+		if (error || !data?.url) throw new Error(error?.message ?? 'Better Auth returned no redirect')
+		return data.url
+	}, `${name}.startGitHubSignIn`)
+
+	// better-auth sends `error` instead of `ott` when the provider refused.
+	const completeRedirect = action(async (params: URLSearchParams) => {
+		const ott = params.get('ott')
+		if (!ott) throw new Error(params.get('error') ?? 'No sign-in in progress')
+		const { data, error } = await wrap(client().verifyOneTimeToken(ott))
+		if (error) throw new Error(error.message ?? 'Sign-in failed')
+		token.set(null)
+		user.set(toUser(data))
+	}, `${name}.completeRedirect`)
+
 	const signOut = action(async () => {
 		user.set(null)
 		token.set(null)
 		await wrap(client().signOut())
 	}, `${name}.signOut`)
 
-	return { id: 'better-auth', user, fetchToken, signIn, signUp, signOut }
+	return {
+		id: 'better-auth',
+		user,
+		fetchToken,
+		signIn,
+		signUp,
+		startGitHubSignIn,
+		redirectParams: ['ott', 'error'],
+		completeRedirect,
+		signOut,
+	}
 }

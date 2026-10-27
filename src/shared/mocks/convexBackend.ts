@@ -13,6 +13,10 @@ import { http, HttpResponse } from 'msw'
 import { BETTER_AUTH_BASE_PATH } from '#convex/authPaths'
 
 export const FAKE_CONVEX_SITE_URL = 'https://convex-site.test'
+const FAKE_GITHUB_AUTHORIZE_URL = 'https://github.test/login/oauth/authorize'
+
+/** The account fake GitHub signs in as. */
+export const FAKE_GITHUB_EMAIL = 'octocat@example.com'
 
 type User = { id: string; provider: AuthProviderId; email: string; password: string }
 type Note = { _id: string; _creationTime: number; owner: string; text: string }
@@ -35,6 +39,10 @@ export function createFakeConvexBackend() {
 		users.set(userKey(provider, email), user)
 		return user
 	}
+
+	// The first GitHub sign-in creates the account.
+	const githubUser = (provider: AuthProviderId) =>
+		users.get(userKey(provider, FAKE_GITHUB_EMAIL)) ?? createUser(provider, FAKE_GITHUB_EMAIL, '')
 
 	const findUser = (provider: AuthProviderId, email: string, password: string) => {
 		const user = users.get(userKey(provider, email))
@@ -88,11 +96,28 @@ export function createFakeConvexBackend() {
 		},
 	})
 
+	// Convex Auth OAuth: the verifier rides to the backend's sign-in route as
+	// `code`; the browser comes back with another code bound to that verifier.
+	const convexAuthCodes = new Map<string, { user: User; verifier: string }>()
+
 	const convexAuth: ConvexAuthTransport = {
-		async signIn({ params, refreshToken }) {
+		async signIn({ provider, params, verifier, refreshToken }) {
 			if (refreshToken) {
 				const user = refreshTokens.get(refreshToken)
 				return { tokens: user ? convexAuthTokens(user) : null }
+			}
+			if (provider === 'github') {
+				const redirect = new URL(`${FAKE_CONVEX_SITE_URL}/api/auth/signin/github`)
+				const started = id('verifier')
+				redirect.searchParams.set('code', started)
+				redirect.searchParams.set('redirectTo', String(params?.['redirectTo']))
+				return { redirect: redirect.href, verifier: started }
+			}
+			if (params?.['code'] !== undefined) {
+				const pending = convexAuthCodes.get(String(params['code']))
+				convexAuthCodes.delete(String(params['code']))
+				if (!pending || pending.verifier !== verifier) throw new Error('Invalid verification code')
+				return { tokens: convexAuthTokens(pending.user) }
 			}
 			const { email, password, flow } = params as Record<string, string>
 			if (!email || !password) throw new Error('Missing credentials')
@@ -123,7 +148,26 @@ export function createFakeConvexBackend() {
 		)
 	}
 
+	// better-auth OAuth: the state names where the callback sends the browser
+	// back, with a one-time token for the new session.
+	const betterAuthStates = new Map<string, string>()
+	const betterAuthOneTimeTokens = new Map<string, User>()
+
 	const betterAuth = {
+		signInSocial: (body: { callbackURL: string }) => {
+			const state = id('state')
+			betterAuthStates.set(state, body.callbackURL)
+			return HttpResponse.json({
+				url: `${FAKE_GITHUB_AUTHORIZE_URL}?state=${state}`,
+				redirect: false,
+			})
+		},
+		verifyOneTimeToken: async (body: { token: string }) => {
+			const user = betterAuthOneTimeTokens.get(body.token)
+			betterAuthOneTimeTokens.delete(body.token)
+			if (!user) throw new Error('Invalid token')
+			return startBetterAuthSession(user)
+		},
 		signUp: async (body: { email: string; password: string }) =>
 			startBetterAuthSession(createUser('better-auth', body.email, body.password)),
 		signIn: async (body: { email: string; password: string }) =>
@@ -171,6 +215,30 @@ export function createFakeConvexBackend() {
 			}),
 		convexAuth,
 		betterAuth,
+		/**
+		 * GitHub approving the sign-in the app sent the browser to, and the
+		 * backend's callback: returns the URL the browser lands on.
+		 */
+		approveGitHubSignIn(url: string) {
+			const target = new URL(url)
+			if (target.href.startsWith(FAKE_GITHUB_AUTHORIZE_URL)) {
+				const callbackURL = betterAuthStates.get(target.searchParams.get('state') ?? '')
+				if (!callbackURL) throw new Error(`Unknown better-auth state in ${url}`)
+				const landing = new URL(callbackURL)
+				const ott = id('ott')
+				betterAuthOneTimeTokens.set(ott, githubUser('better-auth'))
+				landing.searchParams.set('ott', ott)
+				return landing.href
+			}
+			const verifier = target.searchParams.get('code')
+			const redirectTo = target.searchParams.get('redirectTo')
+			if (!verifier || !redirectTo) throw new Error(`Unknown sign-in URL ${url}`)
+			const code = id('code')
+			convexAuthCodes.set(code, { user: githubUser('convex-auth'), verifier })
+			const landing = new URL(redirectTo)
+			landing.searchParams.set('code', code)
+			return landing.href
+		},
 		/** Seeds a Convex Auth account and returns tokens for a restored session. */
 		seedConvexAuthSession(email: string, password: string) {
 			return convexAuthTokens(createUser('convex-auth', email, password))
@@ -220,6 +288,14 @@ export const fakeBetterAuthHandlers = [
 	http.post(betterAuthUrl('/sign-in/email'), async ({ request }) => {
 		const body = (await request.json()) as { email: string; password: string }
 		return fakeConvexBackend.current.betterAuth.signIn(body).catch(errorResponse)
+	}),
+	http.post(betterAuthUrl('/sign-in/social'), async ({ request }) => {
+		const body = (await request.json()) as { callbackURL: string }
+		return fakeConvexBackend.current.betterAuth.signInSocial(body)
+	}),
+	http.post(betterAuthUrl('/cross-domain/one-time-token/verify'), async ({ request }) => {
+		const body = (await request.json()) as { token: string }
+		return fakeConvexBackend.current.betterAuth.verifyOneTimeToken(body).catch(errorResponse)
 	}),
 	http.get(betterAuthUrl('/get-session'), ({ request }) =>
 		fakeConvexBackend.current.betterAuth.getSession(request.headers.get('better-auth-cookie')),

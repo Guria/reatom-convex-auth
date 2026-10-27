@@ -16,5 +16,10 @@ export type AuthAdapter = {
 	fetchToken: AuthTokenFetcher
 	signIn: (credentials: Credentials) => Promise<void>
 	signUp: (credentials: Credentials) => Promise<void>
+	/** Resolves to the GitHub page to send the browser to; it comes back to `returnTo`. */
+	startGitHubSignIn: (returnTo: string) => Promise<string>
+	/** Query params the library adds to `returnTo`. */
+	redirectParams: readonly string[]
+	completeRedirect: (params: URLSearchParams) => Promise<void>
 	signOut: () => Promise<void>
 }

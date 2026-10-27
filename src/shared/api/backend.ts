@@ -23,3 +23,9 @@ export const betterAuthClient = atom(
 	() => createBetterAuthClient(env('VITE_CONVEX_SITE_URL')),
 	'betterAuthClient',
 )
+
+/** Sends the browser to another site; stories replace it to stay on the page. */
+export const assignLocation = atom(
+	() => (url: string) => window.location.assign(url),
+	'assignLocation',
+)

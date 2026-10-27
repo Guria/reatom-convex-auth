@@ -11,7 +11,7 @@ import { readJwtClaims } from './jwt'
 type Tokens = { token: string; refreshToken: string }
 
 // `auth:signIn` declares no return validator; this is the part used here.
-type SignInResult = { tokens?: Tokens | null }
+type SignInResult = { tokens?: Tokens | null; redirect?: string; verifier?: string }
 
 /** Convex Auth's two actions, called over HTTP outside the websocket's auth. */
 export type ConvexAuthTransport = {
@@ -32,6 +32,7 @@ export const createConvexAuthTransport = (url: string): ConvexAuthTransport => (
 export const convexAuthStorageKeys = (namespace: string) => ({
 	token: `__convexAuthJWT_${namespace}`,
 	refreshToken: `__convexAuthRefreshToken_${namespace}`,
+	verifier: `__convexAuthOAuthVerifier_${namespace}`,
 })
 
 const readTokens = (keys: ReturnType<typeof convexAuthStorageKeys>): Tokens | null => {
@@ -44,7 +45,9 @@ const readTokens = (keys: ReturnType<typeof convexAuthStorageKeys>): Tokens | nu
  * Convex Auth's client protocol (its own client ships only as a React
  * provider): `auth:signIn` returns a JWT plus refresh token, the same action
  * exchanges the refresh token for a new pair, and `auth:signOut` ends the
- * server session.
+ * server session. For OAuth, `auth:signIn` returns the provider redirect and a
+ * verifier; the backend sends the browser back with a `code` that, together
+ * with the verifier, signs in.
  */
 export const reatomConvexAuthAdapter = (
 	transport: AtomLike<ConvexAuthTransport>,
@@ -78,6 +81,25 @@ export const reatomConvexAuthAdapter = (
 			tokens.set(result.tokens)
 		}, `${name}.${flow}`)
 
+	const startGitHubSignIn = action(async (returnTo: string) => {
+		const result = await wrap(
+			transport().signIn({ provider: 'github', params: { redirectTo: returnTo } }),
+		)
+		if (!result.redirect || !result.verifier) throw new Error('Convex Auth returned no redirect')
+		localStorage.setItem(keys.verifier, result.verifier)
+		return result.redirect
+	}, `${name}.startGitHubSignIn`)
+
+	const completeRedirect = action(async (params: URLSearchParams) => {
+		const code = params.get('code')
+		const verifier = localStorage.getItem(keys.verifier)
+		localStorage.removeItem(keys.verifier)
+		if (!code || !verifier) throw new Error('No sign-in in progress')
+		const result = await wrap(transport().signIn({ params: { code }, verifier }))
+		if (!result.tokens) throw new Error('Convex Auth returned no session')
+		tokens.set(result.tokens)
+	}, `${name}.completeRedirect`)
+
 	const fetchToken = action(async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
 		const current = tokens()
 		if (!current) return null
@@ -105,6 +127,9 @@ export const reatomConvexAuthAdapter = (
 		fetchToken,
 		signIn: passwordFlow('signIn'),
 		signUp: passwordFlow('signUp'),
+		startGitHubSignIn,
+		redirectParams: ['code'],
+		completeRedirect,
 		signOut,
 	}
 }
