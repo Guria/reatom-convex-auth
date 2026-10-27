@@ -175,6 +175,39 @@ patched SDK is 2 ms behind native on mount and 1.5 ms on unmount under
 the client code above the protocol; this run doesn't profile where. Native
 keeps its 8 KiB bundle advantage.
 
+## The fork builds
+
+Two branches of [Guria/convex-js](https://github.com/Guria/convex-js) build
+`convex@1.48.0` from source:
+
+- `batched-query-set-transitions` ports `convex.patch` to the TypeScript
+  sources ("TS patch").
+- `reatom-browser-client` rewrites `convex/browser` on `@reatom/core` and
+  keeps its API, so convex/react and the binding run on it unchanged
+  ("Reatom SDK"). It batches query set edits and applies transitions per
+  query too.
+
+From [RESULTS_ARTIFACTS.md](../bench/RESULTS_ARTIFACTS.md), 14 columns in
+one page, medians in ms:
+
+| Scenario, per-message | convex/react | convex/react, TS patch | convex/react, Reatom SDK | binding, JSX, TS patch | binding, JSX, Reatom SDK | native, JSX |
+| --------------------- | -----------: | ---------------------: | -----------------------: | ---------------------: | -----------------------: | ----------: |
+| mount                 |         60.5 |                   9.70 |                     10.5 |                   13.4 |                     15.1 |        10.9 |
+| unmount               |         8.77 |                   1.37 |                     1.58 |                   2.81 |                     2.84 |        1.59 |
+| update all            |         3.56 |                   3.88 |                     4.11 |                   3.44 |                     3.53 |        2.50 |
+| coalesced mount       |         13.8 |                   10.3 |                     11.1 |                   13.5 |                     14.8 |        11.0 |
+
+The TS patch matches the ESM patch within noise in every row but one:
+@reatom/react shared update, per-message, at 5.99 ms against 3.71, with an
+IQR of 4.25–6.50 and no gap in the coalesced run. The Reatom
+SDK is within noise of the TS patch in most rows. It's slower in two:
+under @reatom/react it updates 1000 queries in 9.31 ms against 7.14
+(coalesced 10.5 against 7.59), and under @reatom/jsx it mounts them about 1.5 ms slower in both
+response shapes (15.1 against 13.4, coalesced 14.8 against 13.5), with
+overlapping IQRs. It also adds 4.6 KiB gzip to the convex/react app, which
+now ships Reatom. In the binding apps, which ship Reatom anyway, it costs
+0.3 KiB more than the TS patch.
+
 ## Verdict
 
 Not worth pursuing as a replacement for the binding. The patched SDK gets
@@ -186,7 +219,12 @@ pagination splits that the SDK ships with each Convex release. The
 real-backend smoke test already caught one pagination bug the fake server
 had missed: loaded cursors survived a user switch.
 
-Propose `convex.patch` upstream and keep the binding.
+Rewriting `convex/browser` on Reatom doesn't change that. With its API
+kept, it runs as fast as the two-method patch at best, and it makes Reatom
+a dependency of every convex/react app.
+
+Propose the `batched-query-set-transitions` branch upstream and keep the
+binding.
 
 ## Reproduce
 
@@ -196,6 +234,7 @@ mise run validate
 mise run bench --native --write
 mise run bench --native --unbatched --write
 mise run bench --patched --write
+mise run bench --artifacts --write  # needs the tarballs, see packages/bench/README.md
 ```
 
 Against a local anonymous deployment, each in its own terminal:
