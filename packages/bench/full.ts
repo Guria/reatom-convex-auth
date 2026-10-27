@@ -16,7 +16,7 @@ import { captureBrowserErrors } from './browserDiagnostics'
 import { fullReatom } from './fullBuild'
 import { renderFullReport, renderFullSummary } from './fullReport'
 import { summarizeFull } from './fullStats'
-import { renderPlainReport } from './plainReport'
+import { renderPlainReport, renderPlainSummary } from './plainReport'
 
 const { values } = parseArgs({
 	options: {
@@ -411,6 +411,8 @@ try {
 		const report = values.plain ? renderPlainReport(result) : renderFullReport(result)
 		writeFileSync(path.join(benchDir, `RESULTS_${name}.md`), report.markdown)
 		writeFileSync(path.join(benchDir, `RESULTS_${name}.html`), report.html)
+		if (values.plain && sizes.includes(1000))
+			writeFileSync(path.join(benchDir, 'RESULTS_PLAIN_SUMMARY.html'), renderPlainSummary(result))
 		if (!values.plain && sizes.includes(1000))
 			writeFileSync(path.join(benchDir, 'RESULTS_FULL_SUMMARY.html'), renderFullSummary(result))
 	}
