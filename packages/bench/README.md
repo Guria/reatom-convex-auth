@@ -1,5 +1,9 @@
 # Benchmark: convex/react vs the Reatom binding
 
+The focused PR #211 vs Reatom-native comparison is in [RESULTS_FULL.md](RESULTS_FULL.md)
+and [the interactive report](RESULTS_FULL.html). It uses fresh SDK artifacts and the
+v1001 preview, separate from the historical runs below.
+
 ```bash
 mise run bench --native --write            # binding vs native, same Reatom build
 mise run bench --native --unbatched --write # control: one query-set edit per message

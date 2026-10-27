@@ -1,3 +1,5 @@
+import type { MutationOptions } from 'convex/browser'
+
 // The focused suite reuses the existing views and DOM completion observer.
 import { atom, computed, context, VERSION } from '@reatom/core'
 import { BaseConvexClient as Rewritten, reatomConvexClient } from 'convex-artifact-atoms/browser'
@@ -100,6 +102,17 @@ const clientOptions = (WebSocket: typeof globalThis.WebSocket) => ({
 	unsavedChangesWarning: false,
 	logger: false as const,
 })
+const optimisticOptions = (
+	id: number,
+	enabled: boolean | undefined,
+): MutationOptions | undefined =>
+	enabled
+		? {
+				optimisticUpdate: (store) =>
+					store.setQuery(item, { id }, (store.getQuery(item, { id }) ?? 0) + 1),
+			}
+		: undefined
+
 function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket): Watcher {
 	if (kind === 'native-atoms') {
 		const frame = context.start()
@@ -114,18 +127,7 @@ function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket)
 					}),
 				),
 			mutation: (id, optimistic) =>
-				frame.run(() =>
-					client.mutation(
-						write,
-						{ id },
-						optimistic
-							? {
-									optimisticUpdate: (store) =>
-										store.setQuery(item, { id }, (store.getQuery(item, { id }) ?? 0) + 1),
-								}
-							: undefined,
-					),
-				),
+				frame.run(() => client.mutation(write, { id }, optimisticOptions(id, optimistic))),
 			action: (id) => frame.run(() => client.action(echo, { id })),
 			close: () =>
 				frame.run(() => {
@@ -136,14 +138,18 @@ function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket)
 	}
 	const listeners = new Map<string, { id: number; callbacks: Set<(value: number) => void> }>()
 	const Constructor = kind === 'pr-base' ? Patched : Rewritten
+	const deliver = (entry: { id: number; callbacks: Set<(value: number) => void> }) => {
+		const value = client.localQueryResult('bench:scalar', { id: entry.id })
+		if (typeof value !== 'number') return
+		for (const receive of entry.callbacks) receive(value)
+	}
 	const client = new Constructor(
 		CLIENT_URL,
 		(tokens) => {
 			for (const token of tokens) {
 				const entry = listeners.get(token)
 				if (!entry) continue
-				const value = client.localQueryResult('bench:scalar', { id: entry.id })
-				if (typeof value === 'number') for (const receive of entry.callbacks) receive(value)
+				deliver(entry)
 			}
 		},
 		clientOptions(WebSocket),
@@ -165,16 +171,7 @@ function createWatcher(kind: ClientKind, WebSocket: typeof globalThis.WebSocket)
 			}
 		},
 		mutation: (id, optimistic) =>
-			client.mutation(
-				'bench:write',
-				{ id },
-				optimistic
-					? {
-							optimisticUpdate: (store) =>
-								store.setQuery(item, { id }, (store.getQuery(item, { id }) ?? 0) + 1),
-						}
-					: undefined,
-			),
+			client.mutation('bench:write', { id }, optimisticOptions(id, optimistic)),
 		action: (id) => client.action('bench:echo', { id }),
 		close: () => client.close(),
 	}
@@ -188,6 +185,9 @@ export type FullSample = {
 	adds?: number
 	querySetMessages?: number
 	callbacks?: number
+}
+const expectNumber = (actual: number | undefined, expected: number, message: string) => {
+	if (actual !== expected) throw new Error(message)
 }
 const clients: ClientKind[] = ['pr-base', 'native-base', 'native-atoms']
 async function clientRun(kind: ClientKind, config: FullConfig) {
@@ -280,7 +280,7 @@ async function clientRun(kind: ClientKind, config: FullConfig) {
 			() => Promise.all(Array.from({ length: 10 }, () => client.mutation(0, true))),
 			() => seen.get(0) === values.get(0),
 		)
-		if (seen.get(0) !== confirmedValue) throw new Error('Optimistic confirmation mismatch')
+		expectNumber(seen.get(0), confirmedValue, 'Optimistic confirmation mismatch')
 		await time(
 			'unsubscribe distinct',
 			() => stops.splice(0).forEach((stop) => stop()),
@@ -299,8 +299,7 @@ async function clientRun(kind: ClientKind, config: FullConfig) {
 			},
 			() => sharedCallbacks === config.items,
 		)
-		if (server.subscriptionCount('bench:scalar') !== 1)
-			throw new Error('Shared query did not dedupe')
+		expectNumber(server.subscriptionCount('bench:scalar'), 1, 'Shared query did not dedupe')
 		await time(
 			'update shared',
 			() => {

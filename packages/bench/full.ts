@@ -12,9 +12,10 @@ import { chromium } from 'playwright'
 import { build, preview } from 'vite'
 
 import { artifactPlugin, loadArtifacts } from './artifacts'
+import { captureBrowserErrors } from './browserDiagnostics'
 import { fullReatom } from './fullBuild'
-import { renderFullReport } from './fullReport'
-import { pairedRatio, summarize } from './fullStats'
+import { renderFullReport, renderFullSummary } from './fullReport'
+import { summarizeFull } from './fullStats'
 
 const { values } = parseArgs({
 	options: {
@@ -64,7 +65,7 @@ export type FullSummary = {
 	adds: number | null
 	querySetMessages: number | null
 	callbacks: number | null
-	relative?: ReturnType<typeof pairedRatio>
+	relative?: ReturnType<typeof import('./fullStats').pairedRatio>
 }
 export type MemoryRow = {
 	mode: string
@@ -170,62 +171,6 @@ async function bundles(): Promise<BundleRow[]> {
 	return output
 }
 
-function summary(records: FullRecord[]): FullSummary[] {
-	const groups = new Map<string, FullRecord[]>()
-	for (const record of records) {
-		const key = JSON.stringify([
-			record.group,
-			record.size,
-			record.shape,
-			record.mode,
-			record.metric,
-		])
-		const group = groups.get(key) ?? []
-		group.push(record)
-		groups.set(key, group)
-	}
-	return [...groups.values()].map((samples) => {
-		const first = samples[0]!
-		const counts = (
-			key: 'renders' | 'commits' | 'transitions' | 'adds' | 'querySetMessages' | 'callbacks',
-		) => {
-			const values = samples.flatMap((s) =>
-				typeof s[key] === 'number' && Number.isFinite(s[key]) ? [s[key]!] : [],
-			)
-			return values.length ? summarize(values).median : null
-		}
-		const result: FullSummary = {
-			group: first.group,
-			size: first.size,
-			shape: first.shape,
-			mode: first.mode,
-			metric: first.metric,
-			...summarize(samples.map((s) => s.ms)),
-			renders: counts('renders'),
-			commits: counts('commits'),
-			transitions: counts('transitions'),
-			adds: counts('adds'),
-			querySetMessages: counts('querySetMessages'),
-			callbacks: counts('callbacks'),
-		}
-		if (first.mode.startsWith('native-')) {
-			const baselineId =
-				first.mode === 'native-atoms' || first.mode === 'native-base'
-					? 'pr-base'
-					: first.mode.replace('native-', 'pr-')
-			const baseline = groups.get(
-				JSON.stringify([first.group, first.size, first.shape, baselineId, first.metric]),
-			)
-			if (baseline)
-				result.relative = pairedRatio(
-					baseline.map((s) => s.ms),
-					samples.map((s) => s.ms),
-				)
-		}
-		return result
-	})
-}
-
 await build({
 	configFile: false,
 	root: benchDir,
@@ -254,11 +199,7 @@ const server = await preview({
 const browser = await chromium.launch()
 const context = await browser.newContext()
 const page = await context.newPage()
-const errors: string[] = []
-page.on('pageerror', (error) => errors.push(error.message))
-page.on('console', (message) => {
-	if (message.type() === 'error') errors.push(message.text())
-})
+const errors = captureBrowserErrors(page)
 const records: FullRecord[] = []
 const memory: MemoryRow[] = []
 try {
@@ -404,7 +345,7 @@ try {
 		reatom: reatom.provenance(),
 		modes: [...meta.modes],
 		records,
-		summary: summary(records),
+		summary: summarizeFull(records),
 		memory,
 		bundles: await bundles(),
 	}
@@ -415,6 +356,8 @@ try {
 		const report = renderFullReport(result)
 		writeFileSync(path.join(benchDir, 'RESULTS_FULL.md'), report.markdown)
 		writeFileSync(path.join(benchDir, 'RESULTS_FULL.html'), report.html)
+		if (sizes.includes(1000))
+			writeFileSync(path.join(benchDir, 'RESULTS_FULL_SUMMARY.html'), renderFullSummary(result))
 	}
 	console.log(`Saved ${records.length} samples to ${directory}/results.json`)
 } finally {

@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				color: var(--foreground);
+				font: 14px var(--font-sans);
+				line-height: 1.45;
+			}
+			h1 {
+				font-size: 26px;
+				line-height: 1.2;
+				margin: 0 0 8px;
+			}
+			h2 {
+				font-size: 16px;
+				margin: 0 0 6px;
+			}
+			p {
+				margin: 6px 0;
+				color: var(--muted-foreground);
+			}
+			small {
+				font-size: 11px;
+				color: var(--muted-foreground);
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 12px;
+				margin: 18px 0;
+			}
+			.box {
+				background: var(--card);
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				padding: 16px;
+			}
+			.legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 18px;
+				font-size: 12px;
+				margin: 15px 0;
+			}
+			.dot {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				display: inline-block;
+				background: var(--chart-1);
+				margin-right: 5px;
+			}
+			.dot.n {
+				background: var(--chart-2);
+			}
+			.metric {
+				margin-top: 18px;
+				font-size: 12px;
+			}
+			.line {
+				display: flex;
+				justify-content: space-between;
+				gap: 8px;
+			}
+			.track {
+				height: 9px;
+				background: var(--secondary);
+				margin: 5px 0;
+				border-radius: 3px;
+			}
+			.fill {
+				height: 100%;
+				background: var(--chart-1);
+				border-radius: 3px;
+			}
+			.fill.n {
+				background: var(--chart-2);
+			}
+			.number {
+				font: 11px var(--font-mono);
+				white-space: nowrap;
+			}
+			.ratio {
+				display: inline-block;
+				margin-top: 7px;
+				font-size: 12px;
+				font-weight: 600;
+			}
+			.panel {
+				margin: 14px 0;
+			}
+			.table {
+				overflow-x: auto;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 12px;
+			}
+			td,
+			th {
+				padding: 9px 5px;
+				text-align: right;
+				border-bottom: 1px solid var(--border);
+				white-space: nowrap;
+			}
+			td:first-child,
+			th:first-child {
+				text-align: left;
+				white-space: normal;
+			}
+			svg {
+				width: 100%;
+				height: 200px;
+			}
+			svg text {
+				fill: var(--muted-foreground);
+				font: 11px var(--font-sans);
+			}
+			select {
+				font: inherit;
+				color: var(--foreground);
+				background: var(--secondary);
+				border: 1px solid var(--border);
+				padding: 6px 9px;
+				border-radius: 6px;
+				margin: 8px 0;
+			}
+			.method {
+				font-size: 12px;
+				margin-top: 15px;
+			}
+			@media (max-width: 600px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+				.metric {
+					margin-top: 12px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<h1>PR #211 vs Reatom-native</h1>
+		<p>
+			The rewrite pays off for direct atom consumers. Through the existing Convex React API, PR #211
+			is faster to mount and unmount.
+		</p>
+		<small
+			>Apple M4 Pro · Chromium 156 · production React · 17,400 samples · October 27, 2026</small
+		>
+		<div class="legend">
+			<span><i class="dot"></i>PR #211</span><span><i class="dot n"></i>Reatom-native rewrite</span
+			><small>Median ms · lower is better</small>
+		</div>
+		<div id="cards" class="grid"></div>
+		<div class="box panel">
+			<h2>Mount latency as query count grows</h2>
+			<select id="path" aria-label="Renderer for scaling chart">
+				<option value="react">Existing Convex React API</option>
+				<option value="reatom">Reatom consumers + React</option>
+				<option value="jsx">Reatom consumers + JSX</option></select
+			><svg id="scale" role="img" aria-label="Mount scaling"></svg>
+		</div>
+		<div class="box panel">
+			<h2>Bundle and live memory cost</h2>
+			<small
+				>Whole feature-matched app, gzip KiB. Live JS heap at 1,000 queries, MiB. Each cell is PR →
+				rewrite.</small
+			>
+			<div class="table">
+				<table>
+					<thead>
+						<tr>
+							<th>Consumer path</th>
+							<th>Bundle KiB</th>
+							<th>Live heap MiB</th>
+						</tr>
+					</thead>
+					<tbody id="costs"></tbody>
+				</table>
+			</div>
+		</div>
+		<p class="method">
+			Charts use per-message responses and 1,000 distinct queries unless noted. The coalesced run
+			leads to the same conclusion. Both SDKs batch subscription changes. Direct atom columns
+			replace the existing binding, not just the underlying SDK.
+		</p>
+		<p class="method">
+			25 measured iterations after 5 warmups at each of 10, 100, 1,000 and 5,000 queries. No network
+			or real backend latency. Sparse updates include fake-server work. Small differences can be
+			noise. The full report includes IQR, p95, paired bootstrap intervals, client-only tests,
+			optimistic updates, actions, pagination and cleanup retention.
+		</p>
+		<small>PR #211 a5dce54 · Native 9257e2f · Reatom v1001 preview 5f42184</small>
+		<script>
+			const pairs = [
+					{
+						key: 'react',
+						label: 'Existing Convex React API',
+						note: 'Same convex/react hooks on both SDKs.',
+						values: [
+							['mount', 9.4200000166893, 11.144999980926514],
+							['update all', 3.7799999713897705, 3.935000002384186],
+							['unmount', 1.2950000166893005, 1.9350000023841858],
+						],
+						curves: [
+							[0.23500001430511475, 0.925000011920929, 9.4200000166893, 54.375],
+							[0.2149999737739563, 0.9900000095367432, 11.144999980926514, 61.689999997615814],
+						],
+					},
+					{
+						key: 'reatom',
+						label: 'Reatom consumers + React',
+						note: 'PR via binding; rewrite via direct atoms.',
+						values: [
+							['mount', 25.37000000476837, 17.064999997615814],
+							['update all', 8.285000026226044, 6.245000004768372],
+							['unmount', 4.944999992847443, 2.564999997615814],
+						],
+						curves: [
+							[0.32499998807907104, 2.084999978542328, 25.37000000476837, 166.48500001430511],
+							[0.24000000953674316, 1.409999966621399, 17.064999997615814, 111.11000001430511],
+						],
+					},
+					{
+						key: 'jsx',
+						label: 'Reatom consumers + JSX',
+						note: 'PR via binding; rewrite via direct atoms.',
+						values: [
+							['mount', 16.509999990463257, 6.799999952316284],
+							['update all', 4.094999969005585, 2.1450000405311584],
+							['unmount', 2.9649999737739563, 1.0350000262260437],
+						],
+						curves: [
+							[0.23500001430511475, 1.3349999785423279, 16.509999990463257, 94.72999995946884],
+							[0.15500003099441528, 0.7450000047683716, 6.799999952316284, 47.035000026226044],
+						],
+					},
+				],
+				costs = [
+					{
+						label: 'Existing Convex React API',
+						bytes: [87.0888671875, 91.6904296875],
+						heap: [3.84100341796875, 5.21112060546875],
+					},
+					{
+						label: 'Reatom consumers + React',
+						bytes: [93.5205078125, 87.0556640625],
+						heap: [13.771583557128906, 8.326595306396484],
+					},
+					{
+						label: 'Reatom consumers + JSX',
+						bytes: [31.482421875, 24.978515625],
+						heap: [9.03061294555664, 3.8638153076171875],
+					},
+				],
+				sizes = [10, 100, 1000, 5000]
+			const f = (n) => (n < 10 ? n.toFixed(2) : n.toFixed(1))
+			const $ = (id) => document.getElementById(id)
+			$('cards').innerHTML = pairs
+				.map(
+					(p) =>
+						'<section class="box"><h2>' +
+						p.label +
+						'</h2><small>' +
+						p.note +
+						'</small>' +
+						p.values
+							.map(([label, a, b]) => {
+								const max = Math.max(a, b)
+								return (
+									'<div class="metric"><div class="line"><strong>' +
+									label +
+									'</strong><span class="number">' +
+									f(a) +
+									' / ' +
+									f(b) +
+									'</span></div><div class="track"><div class="fill" style="width:' +
+									(a / max) * 100 +
+									'%"></div></div><div class="track"><div class="fill n" style="width:' +
+									(b / max) * 100 +
+									'%"></div></div></div>'
+								)
+							})
+							.join('') +
+						'<span class="ratio">' +
+						(p.values[0][2] < p.values[0][1]
+							? (p.values[0][1] / p.values[0][2]).toFixed(2) + '× faster mount, rewrite'
+							: (p.values[0][2] / p.values[0][1]).toFixed(2) + '× faster mount, PR') +
+						'</span></section>',
+				)
+				.join('')
+			$('costs').innerHTML = costs
+				.map(
+					(c) =>
+						'<tr><td>' +
+						c.label +
+						'</td><td>' +
+						c.bytes.map(f).join(' → ') +
+						'</td><td>' +
+						c.heap.map(f).join(' → ') +
+						'</td></tr>',
+				)
+				.join('')
+			function chart() {
+				const p = pairs.find((p) => p.key === $('path').value),
+					max = Math.max(...p.curves.flat()) * 1.15,
+					x = (n) => 45 + (n / Math.max(...sizes)) * 550,
+					y = (n) => 162 - (n / max) * 140
+				$('scale').setAttribute('viewBox', '0 0 620 195')
+				$('scale').innerHTML =
+					'<title>Mount latency versus distinct query count</title><desc>Linear axes. Median milliseconds, PR #211 and Reatom-native</desc>' +
+					[0, 0.5, 1]
+						.map(
+							(v) =>
+								'<line x1="45" x2="595" y1="' +
+								y(v * max) +
+								'" y2="' +
+								y(v * max) +
+								'" stroke="var(--border)"/><text x="2" y="' +
+								(y(v * max) + 4) +
+								'">' +
+								f(v * max) +
+								'</text>',
+						)
+						.join('') +
+					sizes
+						.filter((n) => n >= 100)
+						.map((n) => '<text x="' + x(n) + '" y="188" text-anchor="middle">' + n + '</text>')
+						.join('') +
+					p.curves
+						.map(
+							(curve, i) =>
+								'<polyline fill="none" stroke="var(--chart-' +
+								(i + 1) +
+								')" stroke-width="2.5" points="' +
+								curve.map((v, k) => x(sizes[k]) + ',' + y(v)).join(' ') +
+								'"/>' +
+								curve
+									.map(
+										(v, k) =>
+											'<circle cx="' +
+											x(sizes[k]) +
+											'" cy="' +
+											y(v) +
+											'" r="3.5" fill="var(--chart-' +
+											(i + 1) +
+											')"><title>' +
+											sizes[k] +
+											' queries: ' +
+											f(v) +
+											' ms</title></circle>',
+									)
+									.join(''),
+						)
+						.join('')
+			}
+			$('path').value = 'jsx'
+			$('path').addEventListener('change', chart)
+			chart()
+		</script>
+	</body>
+</html>

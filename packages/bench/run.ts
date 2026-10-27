@@ -29,6 +29,7 @@ import {
 	type CoreArtifact,
 	type SdkArtifact,
 } from './artifacts'
+import { captureBrowserErrors } from './browserDiagnostics'
 
 const { values: options } = parseArgs({
 	options: {
@@ -325,10 +326,7 @@ async function openPages() {
 	for (const [index, reatom] of builds.entries()) {
 		// A context per page keeps each in its own renderer process and heap.
 		const page = await (await browser.newContext()).newPage()
-		page.on('pageerror', (error) => errors.push(error.message))
-		page.on('console', (message) => {
-			if (message.type() === 'error') errors.push(message.text())
-		})
+		captureBrowserErrors(page, errors)
 		await page.goto(servers[index]!.resolvedUrls!.local[0]!)
 		const version = await page.evaluate(() => (window as unknown as { bench: Bench }).bench.version)
 		pages.set(reatom, { page, version })
