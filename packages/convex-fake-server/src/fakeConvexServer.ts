@@ -66,9 +66,14 @@ const encodeTs = (ts: number) => {
 
 const encodeVersion = (version: Version) => ({ ...version, ts: encodeTs(version.ts) })
 
+// Convex marks its errors with a global symbol, so a ConvexError thrown from
+// another copy of the package still counts.
+const isConvexError = (error: unknown): error is ConvexError<Value> =>
+	error instanceof Error && Symbol.for('ConvexError') in error
+
 const failure = (error: unknown) => ({
 	message: error instanceof Error ? error.message : String(error),
-	errorData: error instanceof ConvexError ? convexToJson(error.data as Value) : null,
+	errorData: isConvexError(error) ? convexToJson(error.data) : null,
 })
 
 const base64url = (value: unknown) =>
