@@ -189,6 +189,27 @@ The binding's query subscriptions run their cleanup through
 instead of `withConnectHook`, which subscribes to `abortVar` and spawns a
 frame per disconnect. Its comment lists what that trades away.
 
+## The action call log fix
+
+[reatom/reatom#1386](https://github.com/reatom/reatom/pull/1386) appends an
+action's call log in place within a tick, unless a middleware such as a
+subscriber or a call hook sits on the action. From
+[RESULTS_ARTIFACTS_ACTION.md](RESULTS_ARTIFACTS_ACTION.md), base `aee4f572`
+against head `9d3c413c`, one action called N times in one tick:
+
+| N    | plain, base | plain, head | subscribed, base | subscribed, head |
+| ---- | ----------: | ----------: | ---------------: | ---------------: |
+| 1000 |        0.46 |        0.20 |             0.46 |             0.50 |
+| 8000 |        45.8 |        1.77 |             44.8 |             48.4 |
+
+Subscribed and hooked actions still copy the log, so they stay quadratic.
+None of the 14 app columns moves beyond noise between the two builds: the
+binding, the native client and the Reatom SDK rewrite don't call one action
+thousands of times in a tick.
+
+This run's raw samples, 850 KB of JSON, exceed the commit hook's size limit,
+so only its report is in the repository.
+
 ## What the binding avoids
 
 `ConvexClient.onUpdate` from `convex/browser` checks every listener on every

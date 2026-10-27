@@ -31,12 +31,12 @@
 		},
 		{
 			"id": "action-patch",
-			"label": "Action-log repair",
+			"label": "Action-log fix",
 			"threadId": "mcp:d82e7971-3f8a-497f-98aa-4fe994b349d4",
 			"repository": "reatom/reatom",
-			"commit": "d28ab4e655bbdf23e4576dcc627c7cbf14800d49",
-			"archive": ".var/bench/artifacts/incoming/reatom-actions.tgz",
-			"sha256": "f2c62405a9a0c50097763fea5d8789a103441d5dc737a8653856c8bc500c3540"
+			"commit": "9d3c413c8c253108089e6f5b6b5fc204f252be5b",
+			"archive": ".var/bench/artifacts/incoming/reatom-core-9d3c413.tgz",
+			"sha256": "f8582e897121208701f31ba73881e87924f85dc195d8bf8549ae5044e44ab4b6"
 		}
 	]
 }
