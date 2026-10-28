@@ -135,6 +135,18 @@ async function iteration(
 	return samples
 }
 
+// The bench CLI runs outside the test suite, so it has no coverage.
+// fallow-ignore-next-line complexity
+const record = (
+	results: Results,
+	samples: Array<{ label: string; byName: Record<string, Sample> }>,
+) => {
+	for (const { label, byName } of samples)
+		for (const [name, sample] of Object.entries(byName))
+			((results[name] ??= {})[label] ??= []).push(sample)
+}
+
+// fallow-ignore-next-line complexity
 async function runtime() {
 	const { browser, page, errors, close } = await openPage()
 	try {
@@ -150,10 +162,7 @@ async function runtime() {
 			const order = index % 2 ? [...workloads].reverse() : workloads
 			for (const workload of order) {
 				const samples = await iteration(page, index % COLUMNS.length, scenarios, errors, workload)
-				if (index < config.warmup) continue
-				for (const { label, byName } of samples)
-					for (const [name, sample] of Object.entries(byName))
-						((results[workload][name] ??= {})[label] ??= []).push(sample)
+				if (index >= config.warmup) record(results[workload], samples)
 			}
 		}
 		return { results, browserVersion: browser.version() }
