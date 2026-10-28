@@ -42,6 +42,15 @@ const outDir = path.resolve(benchDir, '../../.var/bench/runtime')
 const OFFICIAL = 'convex/react'
 const COLUMNS = [OFFICIAL, '@reatom/react', '@reatom/jsx']
 
+const resolve = {
+	alias: [
+		{
+			find: /^@reatom\/jsx\/jsx-runtime$/,
+			replacement: path.join(benchDir, 'reatomJsxRuntime.ts'),
+		},
+	],
+}
+
 type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 type Results = Record<string, Record<string, Sample[]>>
 
@@ -73,8 +82,11 @@ async function openPage() {
 		logLevel: 'warn',
 		plugins: [react()],
 		resolve: {
-			// Production React with <Profiler> callbacks, to count commits.
-			alias: [{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' }],
+			alias: [
+				...resolve.alias,
+				// Production React with <Profiler> callbacks, to count commits.
+				{ find: /^react-dom\/client$/, replacement: 'react-dom/profiling' },
+			],
 		},
 		build: { outDir, emptyOutDir: true },
 	})
@@ -210,6 +222,7 @@ async function bundleSize(entry: string) {
 		root: benchDir,
 		logLevel: 'silent',
 		plugins: [react()],
+		resolve,
 		build: {
 			write: false,
 			minify: true,
@@ -316,6 +329,7 @@ ${workloadReports}
 - shared mount, shared update: ${config.items} components reading one query.
 - optimistic shown, mutation confirmed: a mutation with the same optimistic update on a 100-item list, until the optimistic and then the server result render.
 - first page, load more: pages of 25.
+- 20 transition burst: 20 transitions in a row, each updating the first of ${config.items} queries, until the last one renders.
 - @reatom/jsx renders lists as reactive array children, which rebuild the list on each change.
 
 ## Bundle size

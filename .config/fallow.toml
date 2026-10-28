@@ -3,6 +3,8 @@ entry = [
 	"packages/bench/run.ts",
 	"packages/bench/main.tsx",
 	"packages/bench/size/*.tsx",
+	# run.ts aliases @reatom/jsx's jsx-runtime to it.
+	"packages/bench/reatomJsxRuntime.ts",
 ]
 # `@typescript/native`: TypeScript 7 compiler, not imported by source.
 # `idb-keyval`: optional dependency of @reatom/core. The Storybook/Vite optimizer
