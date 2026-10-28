@@ -7,17 +7,13 @@ An experiment in binding [Convex](https://convex.dev) to
 - The app runs on [`@reatomized/convex`](https://www.npmjs.com/package/@reatomized/convex),
   the published Reatom client for `convex`. Queries, connection and auth state
   are atoms. See [The Convex client](#the-convex-client).
-- `packages/reatom-convex`: a Reatom binding over the stock `ConvexClient`
-  that covers what `convex/react` does. The bench measures it.
-- `packages/reatom-convex-client`: an experimental native Reatom websocket
-  client, without `convex/browser` at runtime. Its
-  [report](packages/reatom-convex-client/README.md) covers compatibility,
-  measurements and missing features.
 - Convex Auth and better-auth on one deployment, behind one session model.
   See [Auth providers](#auth-providers).
-- `packages/bench`: a browser benchmark of the binding against convex/react,
-  rendered by @reatom/react and @reatom/jsx. See
+- `packages/bench`: a browser benchmark of `@reatomized/convex`, rendered by
+  @reatom/react and @reatom/jsx, against convex/react. See
   [packages/bench/README.md](packages/bench/README.md).
+- `packages/convex-fake-server`: an in-process server that speaks Convex's
+  websocket protocol, for stories, tests and the bench.
 
 ## Stack
 
@@ -93,7 +89,7 @@ mise run storybook
 
 ## Demo
 
-https://guria.github.io/reatom-convex-auth/ runs the app against the
+https://reatomized.github.io/convex-demo/ runs the app against the
 production deployment of the Convex project `aleksei-gurianov/reatom-convex-auth`
 (`quirky-buffalo-548`). `.github/workflows/pages.yml` builds it on every push
 to `main` or `exp/reatom-native-convex-client`, with the deployment URLs
@@ -105,7 +101,7 @@ selects the project over the local deployment in `.env.local`:
 ```bash
 export CONVEX_DEPLOYMENT=dev:shiny-tortoise-848
 nub exec convex deploy
-SITE_URL=https://guria.github.io mise run convex:env --prod
+SITE_URL=https://reatomized.github.io mise run convex:env --prod
 ```
 
 Production's GitHub OAuth app has the callback URL
@@ -133,12 +129,14 @@ nub exec convex env set AUTH_GITHUB_ID <client id>
 nub exec convex env set AUTH_GITHUB_SECRET  # reads the secret from stdin
 ```
 
-Both providers run on one deployment. Each library sits behind an adapter in
-`src/shared/api/auth/` that exposes a session atom, sign-in/up/out, and a token
-fetcher. `src/entities/session` hands the active adapter's token to Convex and
-reports `authenticated` only after the backend accepts it. The private notes
-page renders only in that state, so its Convex subscriptions never start for a
-signed-out user.
+Both providers run on one deployment. `src/entities/session` builds a provider
+for each library with `@reatomized/convex/convex-auth` and
+`@reatomized/convex/better-auth`, and passes the selected one to
+`reatomAuthState`, which hands its token to Convex and reports `authenticated`
+only after the backend accepts it. The private notes page renders only in that
+state, so its Convex subscriptions never start for a signed-out user. Sign-in
+goes through the Convex Auth provider's `signIn` or through better-auth's own
+client.
 
 On the backend, both libraries sign RS256 JWTs with the same issuer
 (`CONVEX_SITE_URL`) and audience (`convex`). Convex checks a token against the
@@ -169,7 +167,7 @@ function references are the app's own. `overrides` in
 | `usePaginatedQuery`                      | `convex().paginatedQuery(q, args, { initialNumItems })`, with `loadMore` |
 | `useMutation(m).withOptimisticUpdate(u)` | `convex().mutation(m, args, { optimisticUpdate: u })`                    |
 | `useAction`                              | `convex().action(a, args)`                                               |
-| `useConvexAuth()`                        | `convex().isAuthenticated`, `convex().isRefreshingAuth`                  |
+| `useConvexAuth()`                        | `reatomAuthState(convex(), provider)`: `status`, `isAuthenticated`       |
 | `useConvexConnectionState`               | `convex().connectionState`                                               |
 
 A query is subscribed on the server while something reads its atoms. Query
@@ -178,13 +176,13 @@ errors land in `.error()` and never reach an error boundary. Routes gate on
 `convex/react` work with the client's optimistic updates: the notes page adds
 notes through `insertAtTop`.
 
-The binding in `packages/reatom-convex` maps the same hooks onto the stock
-client. `mise run bench` measures convex/react against it rendered by
-@reatom/react and by @reatom/jsx. Single queries, mutations and pagination
-come out within a few tenths of a millisecond. With 1000 subscriptions at
-once, @reatom/react takes 1.25× as long to mount and 2.2× to unmount;
-@reatom/jsx takes 1.1× and 1.2×, and updates 1000 readers of one query about
-3× faster. See
+`mise run bench` measures convex/react against `@reatomized/convex` rendered
+by @reatom/react and by @reatom/jsx. Single queries, mutations and pagination
+stay within 0.2 ms. Mounting 1000 queries takes 13 ms with @reatom/react and
+6.3 ms with @reatom/jsx, against 54 ms for convex/react when the server
+answers each query-set message, because the client batches subscriptions into
+one message. When many components update at once, @reatom/react is 1.3–1.6×
+slower than convex/react and @reatom/jsx 1.7–3× faster. See
 [packages/bench/README.md](packages/bench/README.md).
 
 ## Validation
