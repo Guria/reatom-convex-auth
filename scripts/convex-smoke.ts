@@ -1,6 +1,8 @@
 // Real-backend smoke check: both auth providers against one running deployment
 // (`mise run convex:dev`). Reads VITE_CONVEX_URL / VITE_CONVEX_SITE_URL from
 // .env.local.
+import { clearStack, context } from '@reatom/core'
+import { reatomConvexClient } from '@reatomized/convex'
 import { ConvexHttpClient } from 'convex/browser'
 import { readFileSync } from 'node:fs'
 
@@ -16,6 +18,13 @@ const env = Object.fromEntries(
 const url = env['VITE_CONVEX_URL']
 const siteUrl = env['VITE_CONVEX_SITE_URL']
 if (!url || !siteUrl) throw new Error('.env.local lacks VITE_CONVEX_URL / VITE_CONVEX_SITE_URL')
+
+if (
+	process.argv.includes('--websocket') &&
+	!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)
+) {
+	throw new Error('The websocket smoke check only writes to a local deployment')
+}
 
 const stamp = Date.now()
 const password = 'correct-horse-battery'
@@ -75,8 +84,10 @@ const rejected = await anonymous.query(api.notes.list, firstPage).then(
 )
 check(rejected, 'anonymous notes.list is rejected')
 
-const convexAuthUser = await asUser(await convexAuthToken(`ca-${stamp}@example.com`))
-const betterAuthUser = await asUser(await betterAuthToken(`ba-${stamp}@example.com`))
+const caToken = await convexAuthToken(`ca-${stamp}@example.com`)
+const baToken = await betterAuthToken(`ba-${stamp}@example.com`)
+const convexAuthUser = await asUser(caToken)
+const betterAuthUser = await asUser(baToken)
 
 const caViewer = await convexAuthUser.query(api.viewer.current, {})
 check(caViewer?.provider === 'convex-auth', 'convex-auth token is accepted, provider claim read')
@@ -96,3 +107,61 @@ check(
 	'better-auth user sees only own note',
 )
 console.log('smoke: all checks passed')
+
+// The app's websocket client, @reatomized/convex; the HTTP checks above also
+// prove isolation.
+if (process.argv.includes('--websocket')) {
+	clearStack()
+	const frame = context.start()
+	const convex = reatomConvexClient(url, { unsavedChangesWarning: false }, 'smoke.client')
+	const viewer = frame.run(() => convex.query(api.viewer.current, {}))
+	const pages = frame.run(() => convex.paginatedQuery(api.notes.list, {}, { initialNumItems: 1 }))
+	const unsubscribe = frame.run(() => viewer.data.subscribe(() => {}))
+	const waitFor = async (predicate: () => boolean) => {
+		const deadline = Date.now() + 15_000
+		while (!frame.run(predicate)) {
+			if (Date.now() > deadline) throw new Error('Websocket smoke timed out')
+			await new Promise((resolve) => setTimeout(resolve, 10))
+		}
+	}
+	let stopPages = () => {}
+	try {
+		await waitFor(() => viewer.data() === null)
+		for (const [provider, token] of [
+			['convex-auth', caToken],
+			['better-auth', baToken],
+		] as const) {
+			frame.run(() => convex.setAuth(async () => token))
+			await waitFor(() => convex.isAuthenticated() === true && viewer.data()?.provider === provider)
+			check(true, `websocket accepts ${provider} token`)
+			await frame.run(() => convex.mutation(api.notes.add, { text: `seed ${provider}` }))
+			stopPages = frame.run(() => pages.results.subscribe(() => {}))
+			await waitFor(() => pages.status() === 'CanLoadMore' || pages.status() === 'Exhausted')
+			check(
+				frame.run(() => pages.loadMore(1)),
+				`websocket ${provider} starts a second page`,
+			)
+			await waitFor(() => pages.results().length === 2)
+			const text = `websocket ${provider}`
+			await frame.run(() => convex.mutation(api.notes.add, { text }))
+			await waitFor(() => pages.results().some((note) => note.text === text))
+			check(true, `websocket ${provider} mutation is visible in a live page`)
+			stopPages()
+			frame.run(() => convex.clearAuth())
+			await waitFor(() => viewer.data() === null)
+		}
+		// A websocket action obtains another real token.
+		const signedIn = await frame.run(() =>
+			convex.action(api.auth.signIn, {
+				provider: 'password',
+				params: { email: `ca-ws-${stamp}@example.com`, password, flow: 'signUp' },
+			}),
+		)
+		check(signedIn.tokens?.token, 'websocket action returns a real JWT')
+	} finally {
+		stopPages()
+		unsubscribe()
+		await frame.run(() => convex.close())
+	}
+	console.log('websocket smoke: all checks passed')
+}

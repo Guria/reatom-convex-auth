@@ -15,6 +15,7 @@ type Credentials = { email: string; password: string }
 
 export const withLoginPage = (I: Pick<BaseActor, 'click' | 'fill' | 'see' | 'waitExit'>) => ({
 	chooseProvider: (label: string) => I.click(role('radio', label)),
+	signInWithGitHub: () => I.click(button('Continue with GitHub')),
 	fillCredentials: async ({ email, password }: Credentials) => {
 		await I.fill(loginLoc.email, email)
 		await I.fill(loginLoc.password, password)

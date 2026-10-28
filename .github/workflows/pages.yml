@@ -1,0 +1,78 @@
+name: Pages
+
+# Publishes the app against the production Convex deployment. The backend is
+# deployed separately; see "Demo" in the README.
+on:
+  push:
+    branches: [main, exp/reatom-native-convex-client]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@47e5e7393d50f4e9544ddaf756aa277972afba2d # v0
+        with:
+          cache-dependency-path: 'nub.lock'
+
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          install: true
+          cache: true
+
+      - name: Config mise
+        run: mise settings experimental=true
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build
+        run: mise run build:webapp:base .var/pages "${{ steps.pages.outputs.base_path }}/"
+        env:
+          VITE_CONVEX_URL: https://quirky-buffalo-548.convex.cloud
+          VITE_CONVEX_SITE_URL: https://quirky-buffalo-548.convex.site
+
+      # Pages has no rewrites. Each route gets the app shell; other paths get
+      # 404.html, which boots the app too.
+      - name: Add route entry points
+        run: |
+          for route in login dashboard notes; do
+            mkdir -p ".var/pages/$route"
+            cp .var/pages/index.html ".var/pages/$route/index.html"
+          done
+          cp .var/pages/index.html .var/pages/404.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: .var/pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

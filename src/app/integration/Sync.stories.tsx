@@ -62,6 +62,9 @@ export const RefreshesExpiredToken = meta.story({ name: 'Refreshes Expired Token
 RefreshesExpiredToken.test('keeps the session when the server expires the token', async () => {
 	await I.seeNote('Seeded note 12')
 	const backend = fakeConvexBackend.current
+	// The restored token, then the fresh one the client trades it for. An
+	// expiry while the fresh one is on its way is ignored.
+	await waitFor(() => expect(backend.authentications()).toBe(2))
 	backend.server.expireAuth()
 	await waitFor(() => expect(backend.subscriptionCount('notes:list')).toBe(0))
 	// The client fetched a fresh token and re-subscribed with it.

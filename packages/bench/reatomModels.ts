@@ -1,35 +1,50 @@
+import type { Computed, Frame } from '@reatom/core'
+
 import { context } from '@reatom/core'
-import { ConvexClient } from 'convex/browser'
-import { reatomConvex } from 'reatom-convex'
+import { reatomConvexClient } from '@reatomized/convex'
 
 import { addNoteFirst, api, CLIENT_URL, type BenchServer, type Handle } from './fixture'
 
-/** The binding's models for one benchmark session, whatever renders them. */
-export function reatomModels({ server }: BenchServer) {
-	const client = new ConvexClient(CLIENT_URL, {
+export type ItemModel = { data: Computed<{ id: number; v: number } | undefined> }
+
+/** What the Reatom views render: @reatomized/convex in a fresh context. */
+export type ReatomModels = {
+	frame: Frame
+	connected(): boolean
+	item(id: number): ItemModel
+	list(handle: Handle): () => Array<{ _id: string; text: string }>
+	pages(initialNumItems: number, handle: Handle): () => Array<{ _id: string; text: string }>
+	close(): Promise<void>
+}
+
+export function reatomModels({ server }: BenchServer): ReatomModels {
+	const convex = reatomConvexClient(CLIENT_URL, {
 		webSocketConstructor: server.WebSocket,
 		skipConvexDeploymentUrlCheck: true,
 		unsavedChangesWarning: false,
 	})
 	const frame = context.start()
-	const convex = reatomConvex(() => client, 'bench')
+	// Connects now, as `new ConvexReactClient` does.
+	const unsubscribe = frame.run(() => convex.connectionState.subscribe(() => {}))
 	return {
-		client,
 		frame,
-		connected: () => client.connectionState().isWebSocketConnected,
-		item: (id: number) => convex.query(api.item, () => ({ id }), `item${id}`),
-		list(handle: Handle) {
-			const notes = convex.query(api.list, () => ({}), 'list')
-			const add = convex.mutation(api.add, 'add', { optimisticUpdate: addNoteFirst })
-			handle.add = (text) => frame.run(() => add({ text }))
+		connected: () => frame.run(() => convex.connectionState().isWebSocketConnected),
+		item: (id) => frame.run(() => convex.query(api.item, { id })),
+		list(handle) {
+			const notes = frame.run(() => convex.query(api.list, {}))
+			handle.add = (text) =>
+				frame.run(() => convex.mutation(api.add, { text }, { optimisticUpdate: addNoteFirst }))
 			return () => notes.data() ?? []
 		},
-		pages(initialNumItems: number, handle: Handle) {
-			const pages = convex.paginatedQuery(api.page, () => ({}), { initialNumItems }, 'pages')
+		pages(initialNumItems, handle) {
+			const pages = frame.run(() => convex.paginatedQuery(api.page, {}, { initialNumItems }))
 			handle.loadMore = (numItems) => frame.run(() => pages.loadMore(numItems))
 			return pages.results
 		},
+		close: () =>
+			frame.run(() => {
+				unsubscribe()
+				return convex.close()
+			}),
 	}
 }
-
-export type ItemModel = ReturnType<ReturnType<typeof reatomModels>['item']>

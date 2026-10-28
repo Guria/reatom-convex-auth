@@ -66,9 +66,14 @@ const encodeTs = (ts: number) => {
 
 const encodeVersion = (version: Version) => ({ ...version, ts: encodeTs(version.ts) })
 
+// Convex marks its errors with a global symbol, so a ConvexError thrown from
+// another copy of the package still counts.
+const isConvexError = (error: unknown): error is ConvexError<Value> =>
+	error instanceof Error && Symbol.for('ConvexError') in error
+
 const failure = (error: unknown) => ({
 	message: error instanceof Error ? error.message : String(error),
-	errorData: error instanceof ConvexError ? convexToJson(error.data as Value) : null,
+	errorData: isConvexError(error) ? convexToJson(error.data) : null,
 })
 
 const base64url = (value: unknown) =>
@@ -122,6 +127,14 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 	let ts = 1
 	let online = true
 	let queryTransitions = 0
+	const traffic = {
+		clientMessages: 0,
+		querySetMessages: 0,
+		adds: 0,
+		removes: 0,
+		serverMessages: 0,
+		evaluations: 0,
+	}
 	// Connection attempts made offline hang, as in a network partition.
 	const pendingOpens = new Set<() => void>()
 
@@ -138,11 +151,13 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 
 	const send = (connection: Connection, message: Record<string, unknown>) => {
 		if (message['type'] === 'Transition') queryTransitions++
+		traffic.serverMessages++
 		const data = JSON.stringify(message)
 		later(() => connection.socket.deliver(data))
 	}
 
 	const evaluate = (connection: Connection, subscription: Subscription) => {
+		traffic.evaluations++
 		const handler = queries[subscription.udfPath]
 		const ctx = { identity: connection.identity, memo: subscription.memo }
 		try {
@@ -327,6 +342,14 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 	}
 
 	const receive = (connection: Connection, message: ClientMessage) => {
+		traffic.clientMessages++
+		if (message.type === 'ModifyQuerySet') {
+			traffic.querySetMessages++
+			for (const edit of message['modifications'] as ClientMessage[]) {
+				if (edit.type === 'Add') traffic.adds++
+				else traffic.removes++
+			}
+		}
 		switch (message.type) {
 			case 'ModifyQuerySet':
 				return modifyQuerySet(connection, message)
@@ -434,6 +457,8 @@ export function createFakeConvexServer(options: FakeConvexServerOptions) {
 		},
 		/** Connection attempts waiting for the server to come back online. */
 		pendingConnections: () => pendingOpens.size,
+		/** Cumulative wire traffic and query evaluations. Returns a snapshot. */
+		traffic: () => ({ ...traffic, transitions: queryTransitions }),
 		/** Number of transitions scheduled for delivery. */
 		transitionCount: () => queryTransitions,
 		/** Server-side subscriptions to `udfPath` across connections. */

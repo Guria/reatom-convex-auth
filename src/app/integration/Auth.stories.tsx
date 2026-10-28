@@ -4,7 +4,7 @@ import preview from '#.storybook/preview'
 import { App } from '#app/App'
 import { loginLoc, withLoginPage } from '#pages/login/testing'
 import { notesLoc, withNotesPage } from '#pages/notes/testing'
-import { fakeConvexBackend } from '#shared/mocks/convexBackend'
+import { FAKE_GITHUB_EMAIL, fakeConvexBackend } from '#shared/mocks/convexBackend'
 import { createActor, heading, role, text } from '#shared/test'
 
 const I = createActor().extend(withLoginPage).extend(withNotesPage)
@@ -126,6 +126,43 @@ ProvidersKeepSeparateAccounts.test(
 		await I.dontSee(notesLoc.heading)
 	},
 )
+
+// The fake GitHub approves at once and sends the browser back to sign-in.
+
+export const GitHubConvexAuth = meta.story({
+	name: 'GitHub (Convex Auth)',
+	parameters: { authProvider: 'convex-auth' },
+})
+
+GitHubConvexAuth.test('signs in through GitHub and back', async () => {
+	await I.signInWithGitHub()
+	await I.see(notesLoc.heading.wait())
+	await I.see(text(`Signed in with Convex Auth as ${FAKE_GITHUB_EMAIL}`).wait())
+	await expectNotesSubscriptions(1)
+})
+
+export const GitHubBetterAuth = meta.story({
+	name: 'GitHub (Better Auth)',
+	parameters: { authProvider: 'better-auth' },
+})
+
+GitHubBetterAuth.test('signs in through GitHub and back', async () => {
+	await I.signInWithGitHub()
+	await I.see(notesLoc.heading.wait())
+	await I.see(text(`Signed in with Better Auth as ${FAKE_GITHUB_EMAIL}`).wait())
+	await expectNotesSubscriptions(1)
+})
+
+export const GitHubRefused = meta.story({
+	name: 'GitHub Refused',
+	parameters: { authProvider: 'better-auth', initialPath: 'login?error=access_denied' },
+})
+
+GitHubRefused.test('reports a refused GitHub sign-in on the sign-in page', async () => {
+	await I.see(text('Could not sign in with GitHub').wait())
+	await I.see(loginLoc.signInHeading)
+	await expectNotesSubscriptions(0)
+})
 
 export const RestoresSession = meta.story({
 	name: 'Restores Session',

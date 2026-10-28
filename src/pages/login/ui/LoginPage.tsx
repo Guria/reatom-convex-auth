@@ -3,7 +3,14 @@ import type { AuthFormModel } from '#pages/login/model/routes'
 import { wrap } from '@reatom/core'
 import { bindField, reatomComponent } from '@reatom/react'
 
-import { authProvider, authProviderLabel, sessionStatus, signOut } from '#entities/session'
+import {
+	authProvider,
+	authProviderLabel,
+	completeRedirect,
+	sessionStatus,
+	signInWithGitHub,
+	signOut,
+} from '#entities/session'
 import { m } from '#paraglide/messages.js'
 import { AUTH_PROVIDERS } from '#shared/api'
 import { Alert, Button, Field, Fieldset, Heading, Input, Text } from '#shared/components'
@@ -47,6 +54,36 @@ const RejectedSession = reatomComponent(
 	),
 	'RejectedSession',
 )
+
+const GitHubSignIn = reatomComponent(({ disabled }: { disabled: boolean }) => {
+	const failed = signInWithGitHub.error() ?? completeRedirect.error()
+	return (
+		<>
+			{failed && (
+				<Alert.Root status="error" role="alert">
+					<Alert.Indicator />
+					<Alert.Content>
+						<Alert.Title>{m.login_github_error_title()}</Alert.Title>
+						<Alert.Description>{m.login_github_error_description()}</Alert.Description>
+					</Alert.Content>
+				</Alert.Root>
+			)}
+			<Text color="muted" textAlign="center">
+				{m.login_or()}
+			</Text>
+			<Button
+				type="button"
+				variant="outline"
+				disabled={disabled}
+				loading={!signInWithGitHub.ready()}
+				loadingText={m.login_github_redirecting()}
+				onClick={wrap(() => signInWithGitHub())}
+			>
+				{m.login_github()}
+			</Button>
+		</>
+	)
+}, 'GitHubSignIn')
 
 export const LoginPage = reatomComponent(({ model }: { model: AuthFormModel }) => {
 	const { mode, form } = model
@@ -125,6 +162,8 @@ export const LoginPage = reatomComponent(({ model }: { model: AuthFormModel }) =
 				>
 					{isSignUp ? m.login_switch_to_signin() : m.login_switch_to_signup()}
 				</Button>
+
+				<GitHubSignIn disabled={pending} />
 			</styled.form>
 		</styled.main>
 	)

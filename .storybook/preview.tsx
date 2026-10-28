@@ -3,6 +3,7 @@ import '../src/setup'
 
 import '../src/index.css'
 
+import { urlAtom } from '@reatom/core'
 import { reatomContext } from '@reatom/react'
 import addonA11y from '@storybook/addon-a11y'
 import { definePreview } from '@storybook/react-vite'
@@ -17,11 +18,10 @@ import { useEffect, useMemo, type PropsWithChildren } from 'react'
 import { handlersArray } from '#app/mocks/handlers'
 import { authProvider } from '#entities/session'
 import {
+	assignLocation,
 	betterAuthClient,
 	convex,
 	type AuthProviderId,
-	convexAuthStorageKeys,
-	convexAuthTransport,
 	createBetterAuthClient,
 } from '#shared/api'
 import {
@@ -29,6 +29,7 @@ import {
 	FAKE_CONVEX_SITE_URL,
 	fakeBetterAuthHandlers,
 	fakeConvexBackend,
+	fakeConvexHttpHandlers,
 } from '#shared/mocks/convexBackend'
 import { css } from '#styled-system/css'
 
@@ -49,7 +50,7 @@ const nativeHTMLElementFocus = globalThis.HTMLElement
 // — every story gets the full route set mocked by default, with individual
 // routes overridable via `msw.use(...)` in a story's `beforeEach`.
 async function setupMswWorker() {
-	const worker = setupWorker(...handlersArray, ...fakeBetterAuthHandlers)
+	const worker = setupWorker(...handlersArray, ...fakeConvexHttpHandlers, ...fakeBetterAuthHandlers)
 	await worker.start({
 		onUnhandledRequest: 'bypass',
 		quiet: true,
@@ -62,11 +63,17 @@ async function setupMswWorker() {
 
 const NO_NOTES: string[] = []
 const SEEDED_USER = { email: 'alex@example.com', password: 'correct-horse' }
-const convexAuthKeys = convexAuthStorageKeys('convexAuth')
-// Auth state persisted by the adapters; each story gets a new fake backend.
+// @convex-dev/auth's keys, under the namespace the session model passes.
+const convexAuthKeys = {
+	token: '__convexAuthJWT_convexAuth',
+	refreshToken: '__convexAuthRefreshToken_convexAuth',
+	verifier: '__convexAuthOAuthVerifier_convexAuth',
+}
+// Auth state persisted by the auth libraries; each story gets a new fake backend.
 const AUTH_STORAGE_KEYS = [
 	convexAuthKeys.token,
 	convexAuthKeys.refreshToken,
+	convexAuthKeys.verifier,
 	'better-auth_cookie',
 	'better-auth_session_data',
 	'authProvider',
@@ -110,9 +117,16 @@ function ReatomDecorator({
 		const backend = startFakeBackend(authenticated, seedNotes)
 		const client = backend.createClient()
 		const storyFrame = setupStorybookUrl(initialPath, () => {
-			convex.client.set(client)
-			convexAuthTransport.set(backend.convexAuth)
-			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
+			convex.set(client)
+			const authClient = createBetterAuthClient(FAKE_CONVEX_SITE_URL)
+			betterAuthClient.set(() => () => authClient)
+			// Leaving for GitHub comes straight back, as if the user approved, to
+			// `/login/`: GitHub Pages answers `/login` with a 301 that adds the slash.
+			assignLocation.set(() => (url: string) => {
+				const landing = new URL(backend.approveGitHubSignIn(url))
+				landing.pathname += '/'
+				urlAtom.set(landing)
+			})
 			if (provider) authProvider.set(provider)
 		})
 		return { storyFrame, client, backend }
@@ -121,7 +135,7 @@ function ReatomDecorator({
 	useEffect(() => {
 		return () => {
 			// The client reconnects on its own until closed.
-			void frame.client.close()
+			void frame.storyFrame.run(() => frame.client.close())
 			frame.backend.server.close()
 			clearAbortErrors()
 			queueMicrotask(clearAbortErrors)

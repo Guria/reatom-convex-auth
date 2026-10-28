@@ -6,8 +6,8 @@ import { styled } from '#styled-system/jsx'
 
 // A token refresh stops the socket too, so it takes precedence.
 export const ConnectionStatus = reatomComponent(() => {
-	const { hasEverConnected, isWebSocketConnected } = convex.connectionState()
-	const message = convex.isRefreshingAuth()
+	const { hasEverConnected, isWebSocketConnected } = convex().connectionState()
+	const message = convex().isRefreshingAuth()
 		? m.session_refreshing()
 		: hasEverConnected && !isWebSocketConnected
 			? m.connection_lost()

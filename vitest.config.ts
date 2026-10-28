@@ -39,7 +39,6 @@ export default defineConfig({
 			// convex:smoke`; the app-owned function logic is unit-tested here.
 			include: [
 				'src/**/*.{ts,tsx}',
-				'packages/reatom-convex/src/**/*.ts',
 				'packages/convex-fake-server/src/**/*.ts',
 				'convex/notes.ts',
 				'convex/viewer.ts',

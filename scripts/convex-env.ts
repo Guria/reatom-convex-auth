@@ -16,22 +16,33 @@ import {
 	randomBytes,
 } from 'node:crypto'
 
-const SITE_URL = process.env['SITE_URL'] ?? 'http://localhost:5173'
+// An explicit `SITE_URL` replaces the stored one; without it the stored one stays.
+const siteUrl = process.env['SITE_URL']
+// `--prod` targets the production deployment of the project that
+// CONVEX_DEPLOYMENT names. On the anonymous local deployment from `.env.local`
+// the CLI ignores it and writes to that deployment.
+const prod = process.argv.includes('--prod')
+const deployment = process.env['CONVEX_DEPLOYMENT']
+if (prod && (!deployment || deployment.startsWith('anonymous:'))) {
+	console.error('--prod needs CONVEX_DEPLOYMENT set to a cloud deployment, such as dev:<name>')
+	process.exit(1)
+}
+const target = prod ? ['--prod'] : []
 
-const convex = (args: string[], input?: string) =>
-	execFileSync('nub', ['exec', 'convex', ...args], {
+const convexEnv = (args: string[], input?: string) =>
+	execFileSync('nub', ['exec', 'convex', 'env', ...target, ...args], {
 		encoding: 'utf8',
 		input,
 		stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'inherit'],
 	})
 
 const get = (name: string) => {
-	const value = convex(['env', 'get', name]).trim()
+	const value = convexEnv(['get', name]).trim()
 	return value === '' ? null : value
 }
 
 const set = (name: string, value: string) => {
-	convex(['env', 'set', name], value)
+	convexEnv(['set', name], value)
 	console.log(`${name}: set`)
 }
 
@@ -46,7 +57,9 @@ const ensure = (name: string, create: () => string) => {
 	return created
 }
 
-ensure('SITE_URL', () => SITE_URL)
+if (siteUrl === undefined) ensure('SITE_URL', () => 'http://localhost:5173')
+else if (get('SITE_URL') === siteUrl) console.log('SITE_URL: up to date')
+else set('SITE_URL', siteUrl)
 const secret = ensure('BETTER_AUTH_SECRET', () => randomBytes(32).toString('base64'))
 // Same format as `npx @convex-dev/auth`: PKCS#8 PEM with newlines as spaces.
 const privatePem = ensure('JWT_PRIVATE_KEY', () =>

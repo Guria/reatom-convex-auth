@@ -85,11 +85,6 @@ export const apiClient = {
 }
 
 export { AUTH_PROVIDERS } from './auth/types'
-export type { AuthAdapter, AuthProviderId, Credentials } from './auth/types'
-export { createBetterAuthClient, reatomBetterAuthAdapter } from './auth/betterAuth'
-export {
-	convexAuthStorageKeys,
-	reatomConvexAuthAdapter,
-	type ConvexAuthTransport,
-} from './auth/convexAuth'
-export { betterAuthClient, convex, convexAuthTransport } from './backend'
+export type { AuthProviderId, Credentials } from './auth/types'
+export { readJwtClaims } from './auth/jwt'
+export { assignLocation, betterAuthClient, convex, createBetterAuthClient } from './backend'

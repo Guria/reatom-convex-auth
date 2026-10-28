@@ -44,7 +44,7 @@ export const reatom: Binding = {
 			clear: view.clear,
 			close: () => {
 				view.dispose()
-				return models.client.close()
+				return models.close()
 			},
 		}
 	},

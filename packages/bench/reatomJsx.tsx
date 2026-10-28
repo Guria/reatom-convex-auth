@@ -1,7 +1,7 @@
 /** @jsxImportSource @reatom/jsx */
 // @reatom/jsx has no keyed reconciliation: `key` would be an unused prop.
 // oxlint-disable react/jsx-key
-// The same binding rendered by @reatom/jsx: real DOM nodes, no virtual DOM.
+// The same models rendered by @reatom/jsx: real DOM nodes, no virtual DOM.
 // Components run once; bound values update the DOM directly.
 import { mount } from '@reatom/jsx'
 
@@ -32,6 +32,7 @@ export const reatomJsx: Binding = {
 		let unmount: (() => void) | undefined
 		const show = (build: () => Element) =>
 			models.frame.run(() => {
+				unmount?.()
 				unmount = mount(container, <div>{build()}</div>).unmount
 			})
 		const clear = () => {
@@ -64,7 +65,7 @@ export const reatomJsx: Binding = {
 			clear,
 			close: () => {
 				clear()
-				return models.client.close()
+				return models.close()
 			},
 		}
 	},

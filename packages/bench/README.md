@@ -1,162 +1,97 @@
-# Benchmark: convex/react vs the Reatom binding
+# Benchmark: convex/react vs @reatomized/convex
 
 ```bash
-mise run bench                    # stable release vs next, print the report
-mise run bench --write            # save RESULTS.md and raw samples in RESULTS.json
-mise run bench --matched --write  # base vs next, as RESULTS_MATCHED.md/.json
+mise run bench          # print the report
+mise run bench --write  # also save it to RESULTS.md
+mise run bench --items 50 --iterations 1 --warmup 0  # quick check that it runs
 ```
 
-[RESULTS.md](RESULTS.md) and [RESULTS_MATCHED.md](RESULTS_MATCHED.md) hold the
-latest numbers. This page explains them.
+[RESULTS.md](RESULTS.md) holds the latest numbers. This page explains how they
+are measured and what they say.
 
 ## How it runs
 
+Three columns run the same scenarios on one page:
+
+- `convex/react`: `ConvexReactClient` with `useQuery`, `usePaginatedQuery` and
+  `useMutation` (`official.tsx`).
+- `@reatom/react`: [`@reatomized/convex`](https://www.npmjs.com/package/@reatomized/convex)
+  rendered by `reatomComponent` (`reatom.tsx`).
+- `@reatom/jsx`: the same models rendered by @reatom/jsx, real DOM nodes with
+  no virtual DOM (`reatomJsx.tsx`).
+
+Both Reatom columns share their models (`reatomModels.ts`); the two React
+columns share the root that counts commits (`reactView.tsx`).
+
 `run.ts` builds `index.html` in production mode, with React's profiling build
-so `<Profiler>` can count commits, once per Reatom build:
-
-- `stable`: the `@reatom/*` releases this package depends on.
-- `next`: what `packages/reatom-next` installs, the pkg.pr.new preview of the
-  Reatom branch
-  [`perf/abort-listener-shared-reason`](https://github.com/reatom/reatom/compare/v1001...perf/abort-listener-shared-reason).
-- `base`, with `--matched` in place of `stable`: what `packages/reatom-base`
-  installs, the `v1001` preview whose sources match that branch's base. The
-  matched pair differs only by the branch's change.
-
-Reatom keeps global state, so a page never loads two copies. A Vite plugin
-resolves every `@reatom/core`, `@reatom/react` and `@reatom/jsx` import, the
-binding's and the adapters' included, from the build's package directory. It
-records the directories it used and fails on a second copy of a package; the
-report header lists the version of each.
-
-The runner opens each build's page in its own browser context, with
-cross-origin isolation for 5µs timers. Five columns run the same scenarios:
-convex/react (`official.tsx`, in the first build's page), and the binding
-rendered by @reatom/react (`reatom.tsx`) and by @reatom/jsx (`reatomJsx.tsx`)
-in each build. Every iteration runs each scenario for all five columns and
-rotates which column starts. Every run gets a fresh server, client and
-container.
+so `<Profiler>` can count commits, and serves it with cross-origin isolation
+for 5µs timers. Playwright drives `window.bench` from `main.tsx`. Each
+iteration runs every scenario for every column, rotating which column goes
+first, and every run gets a fresh server, client and container. Warmup
+iterations are dropped.
 
 A scenario ends when a DOM condition holds, such as 1000 elements with
-`data-v="1"`. `completion.ts` scans the container once, then tracks matches
-from the nodes each mutation record names, so the check costs the same for a
-renderer that commits once and one that patches 1000 nodes separately.
+`data-v="1"`. `completion.ts` scans the container once, then checks only the
+nodes each mutation record names, so the check costs the same for a renderer
+that commits once and one that patches 1000 nodes separately.
 
 The server is `packages/convex-fake-server`, running in the page. It speaks
-Convex's websocket protocol and answers on later macrotasks, so both clients
-do their normal work: JSON parsing, query set versions, optimistic layers.
-Every scenario runs against two response shapes, alternating which goes
-first:
+Convex's websocket protocol and answers on later macrotasks, so the clients do
+their normal work: JSON parsing, query set versions, optimistic layers. Every
+scenario runs against two response shapes, alternating which goes first:
 
-- per-message: one transition for each query-set message, so mounting 1000
-  queries brings back up to 1000 transitions. This is a stress case.
+- per-message: one transition for each query-set message. A client that sends
+  one message per subscription gets up to 1000 transitions for 1000 queries.
 - coalesced: one transition after a burst of query-set messages.
 
 Neither is a claim about how a deployed Convex backend groups its responses.
-`server.bump()` recomputes every subscribed query inside the timed action;
-both clients pay that.
 
-Published @reatom/jsx has only the classic `h`/`hf` runtime; its
-`jsx-runtime` entry exports neither `jsx` nor `Fragment`. For a build whose
-`jsx-runtime` lacks `jsx`, the plugin resolves it to `reatomJsxRuntime.ts`, a
-small adapter over `h`. All three builds here use it.
+@reatom/jsx's `jsx-runtime` entry exports only the classic `h`/`hf`, so
+`run.ts` resolves `@reatom/jsx/jsx-runtime` to `reatomJsxRuntime.ts`, a small
+automatic runtime over them.
 
-Bundle sizes come from minified builds of `size/*.tsx`. Each one is the same
-small app: client, auth, connection state, a skippable query, an optimistic
-mutation and a paginated query. The Reatom apps and their baselines are built
-once per Reatom build.
+Bundle sizes come from minified builds of `size/*.tsx`. Each Convex app is the
+same small app over `size/app.ts` or its convex/react equivalent: client,
+auth, connection state, a skippable query, an optimistic mutation and a
+paginated query. Its Convex share is its size over a baseline with the same
+view layer and no Convex.
 
 ## What the numbers say
 
-The stable build against convex/react, from [RESULTS.md](RESULTS.md). All
-three are within a few tenths of a millisecond on single queries, mutations,
-optimistic updates and pagination. The gaps show up when 1000 subscriptions
-start, stop or update at once, and they depend more on the view layer than on
-the binding.
+From [RESULTS.md](RESULTS.md), 1000 components where a scenario mounts many.
 
-With @reatom/jsx:
+- **Mounting 1000 queries with per-message responses: 54 ms for convex/react,
+  13 ms with @reatom/react, 6.3 ms with @reatom/jsx.** convex/browser sends a
+  query-set message per subscription and gets 1001 transitions back.
+  @reatomized/convex batches the changes of one microtask into one message, so
+  the server answers twice.
+- **With coalesced responses that batching no longer matters.** Mount is 11.5
+  ms for convex/react, 13.6 ms (1.18×) with @reatom/react and 6.0 ms (0.52×)
+  with @reatom/jsx.
+- **Unmount is faster in both Reatom columns:** 0.24× and 0.09× per-message,
+  0.48× and 0.20× coalesced.
+- **@reatom/react is slower when many components update at once.** Update all
+  1.3–1.6×, shared mount and shared update 1.4–1.6×, about 1–3 ms over 1000
+  components. @reatom/jsx is 0.3–0.6× on the same rows, so the cost is in
+  `reatomComponent`, not the client.
+- **Single queries, mutations, optimistic updates and pagination stay within
+  0.2 ms in every column.** @reatom/jsx is 1.7–1.8× on the 100-item list,
+  0.08–0.16 ms more, because reactive array children rebuild the list.
+- **Fewer renders.** Both Reatom columns render each item twice on mount,
+  against three times for `useQuery`, and @reatom/react commits twice where
+  convex/react commits three or four times.
+- **Bundle.** The Convex share is 15.9 KiB gzip with @reatom/react and 16.8 KiB
+  with @reatom/jsx, against 20.9 KiB for convex/react. The @reatom/jsx app is
+  24.9 KiB in total, against 86.7 KiB for the convex/react one, because React
+  is gone.
 
-- **Close to convex/react on lifecycle.** Per-message mount 1.08×, unmount
-  1.19×, update all 1.03×.
-- **Faster when many elements read one query.** Mount 0.40×, update 0.35×:
-  there is no component layer, so an update writes the bound attributes.
-- **Slower on the 100-item list.** Optimistic update 1.9×, confirmed mutation
-  2.0×. Reactive array children rebuild the whole list on each change; a
-  `reatomLinkedList` is upstream's answer for lists that change often.
-- **Smallest bundle.** The whole app is 30.7 KiB gzip against 86.7 KiB for
-  convex/react, because React is gone.
-
-With @reatom/react:
-
-- **Mount 1000 queries: 1.25× per-message (+15 ms), 2.1× coalesced (+14 ms).**
-  Each query model is several atoms plus a connect action per subscription.
-- **Unmount 1000 queries: 2.2× per-message (+10 ms), 3.7× coalesced (+11 ms).**
-  Most of it is detaching `abortVar` listeners, see below.
-- **Update 1000 queries in one transition: 1.9× (+3 ms).** About 3µs per
-  update for `wrap()`, the atom write and recompute, and the component
-  notification.
-- **Fewer renders.** The binding renders each item twice on mount, against
-  three times for `useQuery`, and commits half as often.
-- **Bundle: +1.2 KiB gzip** for the Convex part over convex/react's, in an app
-  that already ships Reatom. Without Reatom, add its 5.3 KiB.
-
-The same binding runs close to convex/react under @reatom/jsx, so most of the
-@reatom/react gap is per-component work in `reatomComponent`, not the binding.
-
-None of this shows on a page with a few dozen queries. It matters only when
-hundreds of subscriptions start or stop in one frame.
-
-## The `abortVar` listener patch
-
-`abortVar.subscribe` detaches its listeners with `listenerController.abort()`.
-Without a reason, `abort()` builds a `DOMException` with a stack trace, once
-per detach, and nothing reads it. `reatomComponent` subscribes every
-component, so unmounting 1000 components builds 1000 of them. The branch in
-`next` passes one shared reason instead.
-
-From [RESULTS_MATCHED.md](RESULTS_MATCHED.md), base against next:
-
-| @reatom/react unmount, 1000 queries |   base, ms (IQR) |   next, ms (IQR) |
-| ----------------------------------- | ---------------: | ---------------: |
-| per-message                         | 18.9 (18.0–19.5) | 11.8 (11.7–13.3) |
-| coalesced                           | 15.5 (14.9–16.3) | 8.80 (7.15–9.17) |
-
-That is about 7µs per component. A second run with convex/react moved into
-the `next` page gave 21.8 → 12.9 ms and 18.3 → 7.96 ms. @reatom/jsx unmount
-does not change: it has no per-component `abortVar` subscription. No other
-row moves consistently, see [Limits](#limits).
-
-The binding's query subscriptions run their cleanup through
-`withSyncConnectHook` (`packages/reatom-convex/src/withSyncConnectHook.ts`)
-instead of `withConnectHook`, which subscribes to `abortVar` and spawns a
-frame per disconnect. Its comment lists what that trades away.
-
-## What the binding avoids
-
-`ConvexClient.onUpdate` from `convex/browser` checks every listener on every
-transition. With one transition per new subscription, as in the per-message
-workload, N subscriptions cost O(N²). Without React, 1000 `onUpdate`
-subscriptions took about 300 ms, against about 4 ms for
-`ConvexReactClient.watchQuery`. The binding subscribes through `client.client`
-(`BaseConvexClient`) instead and dispatches by query token the way
-`ConvexReactClient` does (`watchQuery` in
-`packages/reatom-convex/src/reatomConvex.ts`). With `onUpdate`, the mount
-scenario took 268 ms.
-
-Paginated queries still go through `ConvexClient.onPaginatedUpdate_experimental`
-because the paginated query client is not exported. That's fine for the few
-paginated lists an app usually has.
+None of this shows on a page with a few dozen queries. The differences matter
+when hundreds of subscriptions start, stop or update in one frame.
 
 ## Limits
 
-- Page placement shifts results by up to about 10%. The Reatom columns in the
-  page that also runs convex/react come out faster on some rows. Moving
-  convex/react to the other page flipped the build-to-build differences in
-  mount, shared mount and first page. Treat differences between builds under
-  10% as noise.
-- One machine, one browser. Treat the ratios as more meaningful than the
-  absolute times.
+- One machine, one browser. The ratios mean more than the absolute times.
 - React runs its profiling build for timing and render counts alike.
-- The official pagination column measures the stable `usePaginatedQuery`,
-  which keeps pages in React state. The binding uses the core paginated query
-  client, the same one `usePaginatedQuery_experimental` uses.
 - Below 0.3 ms, scheduling and harness overhead dominate.
+- The fake server answers in the page, so there is no network latency, and
+  the response shapes are synthetic.

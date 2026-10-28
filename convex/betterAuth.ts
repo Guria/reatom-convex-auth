@@ -11,6 +11,12 @@ import { BETTER_AUTH_BASE_PATH } from './authPaths'
 
 const siteUrl = env.SITE_URL ?? 'http://localhost:5173'
 
+// The same GitHub OAuth app serves Convex Auth, whose provider reads these too.
+const github =
+	env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET
+		? { github: { clientId: env.AUTH_GITHUB_ID, clientSecret: env.AUTH_GITHUB_SECRET } }
+		: {}
+
 export const authComponent = createClient<DataModel>(components.betterAuth)
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
@@ -20,6 +26,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
 		trustedOrigins: [siteUrl],
 		database: authComponent.adapter(ctx),
 		emailAndPassword: { enabled: true, requireEmailVerification: false },
+		socialProviders: github,
 		plugins: [
 			crossDomain({ siteUrl }),
 			convex({

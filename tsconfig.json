@@ -4,8 +4,7 @@
 		{ "path": "./tsconfig.app.json" },
 		{ "path": "./tsconfig.node.json" },
 		{ "path": "./packages/bench" },
-		{ "path": "./packages/convex-fake-server" },
-		{ "path": "./packages/reatom-convex" }
+		{ "path": "./packages/convex-fake-server" }
 	],
 	"compilerOptions": {
 		"paths": {

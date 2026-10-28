@@ -1,6 +1,6 @@
 // Runtime benchmark: the same scenarios for each binding, each run on a fresh
-// fake server, client and container. `run.ts` builds this page once per Reatom
-// build in production mode and drives `window.bench` from Playwright.
+// fake server, client and container. `run.ts` builds this page in production
+// mode and drives `window.bench` from Playwright.
 import { clearStack, VERSION } from '@reatom/core'
 
 import {
@@ -20,8 +20,11 @@ import { reatomJsx } from './reatomJsx'
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
 
-type Config = { items: number; queryResponses: 'per-message' | 'coalesced' }
-type Sample = { ms: number; renders: number; commits: number }
+type Config = {
+	items: number
+	queryResponses: 'per-message' | 'coalesced'
+}
+type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
 const allBindings = [official, reatom, reatomJsx]
 
@@ -33,9 +36,18 @@ async function session<T>(binding: Binding, config: Config, run: (ctx: Context) 
 	const container = document.createElement('div')
 	document.body.append(container)
 	const instance = binding.create(server, container)
-	while (!instance.connected()) await settle(server)
 	try {
+		const deadline = performance.now() + 10_000
+		while (!instance.connected()) {
+			if (performance.now() > deadline) throw new Error(`${binding.label}: connection timed out`)
+			await settle(server)
+		}
 		return await run({ server, instance, container })
+	} catch (error) {
+		throw new Error(
+			`${binding.label}: ${String(error)}; traffic ${JSON.stringify(server.server.traffic())}; DOM ${container.innerHTML.slice(0, 600)}`,
+			{ cause: error },
+		)
 	} finally {
 		await instance.close()
 		container.remove()
@@ -67,7 +79,9 @@ const distinctQueries: Scenario = (binding, config) =>
 		const { items } = config
 		const ids = Array.from({ length: items }, (_, index) => index)
 		const all = (v: number) => ({ selector: `[data-v="${v}"]`, count: config.items })
+		const beforeMount = server.server.transitionCount()
 		const mount = await measure(container, () => instance.items(ids), all(0))
+		mount.transitions = server.server.transitionCount() - beforeMount
 		const updateAll = await measure(container, () => server.bump(ids), all(1))
 		const middle = Math.floor(items / 2)
 		const updateOne = await measure(container, () => server.bump([middle]), {
@@ -130,11 +144,26 @@ const pagination: Scenario = (binding, config) =>
 		return { 'first page': first, 'load more': more }
 	})
 
+const updateBurst: Scenario = (binding, config) =>
+	session(binding, config, async ({ server, instance, container }) => {
+		instance.items(Array.from({ length: config.items }, (_, i) => i))
+		await until(container, { selector: '[data-v="0"]', count: config.items })
+		const result = await measure(
+			container,
+			() => {
+				for (let i = 0; i < 20; i++) server.bump([0])
+			},
+			{ selector: '[data-id="0"][data-v="20"]', count: 1 },
+		)
+		return { '20 transition burst': result }
+	})
+
 const allScenarios: Record<string, Scenario> = {
 	distinctQueries,
 	sharedQuery,
 	optimisticMutation,
 	pagination,
+	updateBurst,
 }
 
 // Without React there are no commits to count.
@@ -152,7 +181,11 @@ async function runOnce(label: string, scenario: string, config: Config) {
 	)
 }
 
-const bench = { version: VERSION, scenarios: Object.keys(allScenarios), run: runOnce }
+export const bench = {
+	version: VERSION,
+	scenarios: Object.keys(allScenarios),
+	run: runOnce,
+}
 
 /** What `run.ts` calls as `window.bench`. */
 export type Bench = typeof bench

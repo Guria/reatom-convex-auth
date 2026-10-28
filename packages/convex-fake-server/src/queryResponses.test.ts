@@ -22,14 +22,22 @@ test.each(['per-message', 'coalesced'] as const)(
 			// Wait for the open socket before starting one synchronous burst.
 			await vi.waitFor(() => expect(client.connectionState().isWebSocketConnected).toBe(true))
 			const before = server.transitionCount()
+			const trafficBefore = server.traffic()
 			for (let id = 0; id < 10; id++) {
 				unsubs.push(client.onUpdate(item, { id }, (value) => received.set(id, value)))
 			}
 			await vi.waitFor(() => expect(received.size).toBe(10))
 			expect([...received]).toEqual(Array.from({ length: 10 }, (_, id) => [id, id]))
 			expect(server.transitionCount() - before).toBe(queryResponses === 'per-message' ? 10 : 1)
+			const traffic = server.traffic()
+			expect(traffic.adds - trafficBefore.adds).toBe(10)
+			expect(traffic.evaluations - trafficBefore.evaluations).toBe(10)
+			expect(traffic.querySetMessages - trafficBefore.querySetMessages).toBe(10)
+			traffic.adds = -1
+			expect(server.traffic().adds).toBe(10)
 			for (const unsub of unsubs) unsub()
 			await vi.waitFor(() => expect(server.subscriptionCount('test:item')).toBe(0))
+			expect(server.traffic().removes).toBe(10)
 		} finally {
 			await client.close()
 			server.close()
