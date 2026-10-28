@@ -20,6 +20,14 @@ export default defineMain({
 	staticDirs: ['../public'],
 	viteFinal: (config) => {
 		config.base = base
+		// Stories run against the fake deployment (src/shared/mocks/convexBackend.ts),
+		// whose clients the preview sets into the backend atoms. Setting an atom
+		// runs its initializer first, which needs these even without .env.local.
+		config.define = {
+			...config.define,
+			'import.meta.env.VITE_CONVEX_URL': JSON.stringify('https://fake.convex.cloud'),
+			'import.meta.env.VITE_CONVEX_SITE_URL': JSON.stringify('https://convex-site.test'),
+		}
 		config.server = {
 			...config.server,
 			hmr: false,
