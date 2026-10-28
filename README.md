@@ -78,8 +78,8 @@ mise run dev
 ```
 
 The site URL better-auth trusts is `SITE_URL` on the deployment, which defaults
-to `http://localhost:5173`. Run `SITE_URL=... mise run convex:env` on a fresh
-deployment to use another origin.
+to `http://localhost:5173`. Run `SITE_URL=... mise run convex:env` to use
+another origin.
 
 Start Storybook:
 

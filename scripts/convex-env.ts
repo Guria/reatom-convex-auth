@@ -16,7 +16,8 @@ import {
 	randomBytes,
 } from 'node:crypto'
 
-const SITE_URL = process.env['SITE_URL'] ?? 'http://localhost:5173'
+// An explicit `SITE_URL` replaces the stored one; without it the stored one stays.
+const siteUrl = process.env['SITE_URL']
 // `--prod` targets the production deployment of the configured project.
 const target = process.argv.includes('--prod') ? ['--prod'] : []
 
@@ -48,7 +49,9 @@ const ensure = (name: string, create: () => string) => {
 	return created
 }
 
-ensure('SITE_URL', () => SITE_URL)
+if (siteUrl === undefined) ensure('SITE_URL', () => 'http://localhost:5173')
+else if (get('SITE_URL') === siteUrl) console.log('SITE_URL: up to date')
+else set('SITE_URL', siteUrl)
 const secret = ensure('BETTER_AUTH_SECRET', () => randomBytes(32).toString('base64'))
 // Same format as `npx @convex-dev/auth`: PKCS#8 PEM with newlines as spaces.
 const privatePem = ensure('JWT_PRIVATE_KEY', () =>
