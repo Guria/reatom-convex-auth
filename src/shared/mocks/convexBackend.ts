@@ -1,17 +1,18 @@
 // In-memory stand-in for the Convex deployment in stories. The app's real
 // Convex client talks to it over a fake websocket (see convex-fake-server);
-// better-auth's HTTP endpoints are mocked with MSW so its real client and
-// cross-domain plugin run. Tokens are unsigned JWTs with the same claims the
-// real backend issues (convex/auth.ts, convex/betterAuth.ts).
-import type { AuthProviderId, ConvexAuthTransport } from '#shared/api'
+// Convex Auth's HTTP refresh exchange and better-auth's endpoints are mocked
+// with MSW so the real clients run. Tokens are unsigned JWTs with the same
+// claims the real backend issues (convex/auth.ts, convex/betterAuth.ts).
+import type { AuthProviderId } from '#shared/api'
 
 import { reatomConvexClient } from '@reatomized/convex'
 import { createFakeConvexServer, fakeJwt, paginate, readFakeJwt } from 'convex-fake-server'
-import { ConvexError } from 'convex/values'
+import { ConvexError, convexToJson, jsonToConvex, type JSONValue, type Value } from 'convex/values'
 import { http, HttpResponse } from 'msw'
 
 import { BETTER_AUTH_BASE_PATH } from '#convex/authPaths'
 
+export const FAKE_CONVEX_URL = 'https://fake.convex.cloud'
 export const FAKE_CONVEX_SITE_URL = 'https://convex-site.test'
 const FAKE_GITHUB_AUTHORIZE_URL = 'https://github.test/login/oauth/authorize'
 
@@ -27,7 +28,7 @@ export function createFakeConvexBackend() {
 	let nextId = 1
 	const id = (prefix: string) => `${prefix}${nextId++}`
 	const users = new Map<string, User>()
-	const refreshTokens = new Map<string, User>()
+	const refreshTokens = new Map<string, { user: User; sessionId: string }>()
 	const betterAuthSessions = new Map<string, User>()
 	const notes: Note[] = []
 
@@ -51,16 +52,55 @@ export function createFakeConvexBackend() {
 	}
 
 	// Convex Auth's subject is `userId|sessionId`; better-auth's is the user id.
-	const convexAuthTokens = (user: User) => {
+	// A refresh keeps the session.
+	const convexAuthTokens = (user: User, sessionId = id('session')) => {
 		const refreshToken = id('refresh')
-		refreshTokens.set(refreshToken, user)
-		const sub = `${user.id}|${id('session')}`
+		refreshTokens.set(refreshToken, { user, sessionId })
+		const sub = `${user.id}|${sessionId}`
 		return { token: fakeJwt({ sub, provider: 'convex-auth', email: user.email }), refreshToken }
 	}
+
+	// Convex Auth OAuth: the verifier rides to the backend's sign-in route as
+	// `code`; the browser comes back with another code bound to that verifier.
+	const convexAuthCodes = new Map<string, { user: User; verifier: string }>()
+
+	// `auth:signIn`, over the websocket and, for refresh tokens, over HTTP.
+	const convexAuthSignIn = (args: Record<string, Value>) => {
+		const { provider, verifier, refreshToken } = args as Record<string, string | undefined>
+		const params = args['params'] as Record<string, Value> | undefined
+		if (refreshToken) {
+			const session = refreshTokens.get(refreshToken)
+			refreshTokens.delete(refreshToken)
+			return { tokens: session ? convexAuthTokens(session.user, session.sessionId) : null }
+		}
+		if (provider === 'github') {
+			const redirect = new URL(`${FAKE_CONVEX_SITE_URL}/api/auth/signin/github`)
+			const started = id('verifier')
+			redirect.searchParams.set('code', started)
+			redirect.searchParams.set('redirectTo', String(params?.['redirectTo']))
+			return { redirect: redirect.href, verifier: started }
+		}
+		if (params?.['code'] !== undefined) {
+			const pending = convexAuthCodes.get(String(params['code']))
+			convexAuthCodes.delete(String(params['code']))
+			if (!pending || pending.verifier !== verifier) throw new Error('Invalid verification code')
+			return { tokens: convexAuthTokens(pending.user) }
+		}
+		const { email, password, flow } = params as Record<string, string>
+		if (!email || !password) throw new Error('Missing credentials')
+		const user =
+			flow === 'signUp'
+				? createUser('convex-auth', email, password)
+				: findUser('convex-auth', email, password)
+		return { tokens: convexAuthTokens(user) }
+	}
+
+	let authentications = 0
 
 	// convex/viewer.ts: the owner is the provider plus its user id.
 	const server = createFakeConvexServer({
 		authenticate: (token) => {
+			authentications++
 			const { sub, provider, email } = readFakeJwt(token)
 			if (typeof sub !== 'string' || typeof email !== 'string') return 'Invalid token'
 			if (provider !== 'convex-auth' && provider !== 'better-auth') return 'Unknown provider'
@@ -81,6 +121,10 @@ export function createFakeConvexBackend() {
 				return paginate(ctx, owned, paginationOpts!)
 			},
 		},
+		actions: {
+			'auth:signIn': (_ctx, args) => convexAuthSignIn(args),
+			'auth:signOut': () => null,
+		},
 		mutations: {
 			'notes:add': ({ identity }, { text }) => {
 				if (!identity) throw new ConvexError('Not authenticated')
@@ -95,40 +139,6 @@ export function createFakeConvexBackend() {
 			},
 		},
 	})
-
-	// Convex Auth OAuth: the verifier rides to the backend's sign-in route as
-	// `code`; the browser comes back with another code bound to that verifier.
-	const convexAuthCodes = new Map<string, { user: User; verifier: string }>()
-
-	const convexAuth: ConvexAuthTransport = {
-		async signIn({ provider, params, verifier, refreshToken }) {
-			if (refreshToken) {
-				const user = refreshTokens.get(refreshToken)
-				return { tokens: user ? convexAuthTokens(user) : null }
-			}
-			if (provider === 'github') {
-				const redirect = new URL(`${FAKE_CONVEX_SITE_URL}/api/auth/signin/github`)
-				const started = id('verifier')
-				redirect.searchParams.set('code', started)
-				redirect.searchParams.set('redirectTo', String(params?.['redirectTo']))
-				return { redirect: redirect.href, verifier: started }
-			}
-			if (params?.['code'] !== undefined) {
-				const pending = convexAuthCodes.get(String(params['code']))
-				convexAuthCodes.delete(String(params['code']))
-				if (!pending || pending.verifier !== verifier) throw new Error('Invalid verification code')
-				return { tokens: convexAuthTokens(pending.user) }
-			}
-			const { email, password, flow } = params as Record<string, string>
-			if (!email || !password) throw new Error('Missing credentials')
-			const user =
-				flow === 'signUp'
-					? createUser('convex-auth', email, password)
-					: findUser('convex-auth', email, password)
-			return { tokens: convexAuthTokens(user) }
-		},
-		async signOut() {},
-	}
 
 	const betterAuthSession = (cookie: string | null) => {
 		const token = cookie?.match(/better-auth\.session_token=([^;]+)/)?.[1]
@@ -208,12 +218,12 @@ export function createFakeConvexBackend() {
 		server,
 		/** A real Convex client connected to this deployment. */
 		createClient: () =>
-			reatomConvexClient('https://fake.convex.cloud', {
+			reatomConvexClient(FAKE_CONVEX_URL, {
 				webSocketConstructor: server.WebSocket,
 				skipConvexDeploymentUrlCheck: true,
 				unsavedChangesWarning: false,
 			}),
-		convexAuth,
+		convexAuthSignIn,
 		betterAuth,
 		/**
 		 * GitHub approving the sign-in the app sent the browser to, and the
@@ -255,6 +265,8 @@ export function createFakeConvexBackend() {
 					text,
 				})
 		},
+		/** User tokens the server has received. */
+		authentications: () => authentications,
 		/** Server-side subscriptions to a query, e.g. `notes:list`. */
 		subscriptionCount: server.subscriptionCount,
 	}
@@ -279,6 +291,28 @@ const errorResponse = (error: unknown) =>
 	HttpResponse.json({ message: toError(error).message }, { status: 401 })
 
 const betterAuthUrl = (path: string) => `${FAKE_CONVEX_SITE_URL}${BETTER_AUTH_BASE_PATH}${path}`
+
+/** Convex's HTTP action endpoint, which Convex Auth's refresh exchange uses. */
+export const fakeConvexHttpHandlers = [
+	http.post(`${FAKE_CONVEX_URL}/api/action`, async ({ request }) => {
+		const body = (await request.json()) as { path: string; args: JSONValue[] }
+		if (body.path !== 'auth:signIn')
+			return HttpResponse.json(
+				{ status: 'error', errorMessage: `No HTTP action ${body.path}`, logLines: [] },
+				{ status: 560 },
+			)
+		try {
+			const args = jsonToConvex(body.args[0] ?? {}) as Record<string, Value>
+			const value = fakeConvexBackend.current.convexAuthSignIn(args)
+			return HttpResponse.json({ status: 'success', value: convexToJson(value), logLines: [] })
+		} catch (error) {
+			return HttpResponse.json(
+				{ status: 'error', errorMessage: toError(error).message, logLines: [] },
+				{ status: 560 },
+			)
+		}
+	}),
+]
 
 export const fakeBetterAuthHandlers = [
 	http.post(betterAuthUrl('/sign-up/email'), async ({ request }) => {

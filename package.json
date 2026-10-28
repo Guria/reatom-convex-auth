@@ -41,7 +41,7 @@
 		"@icons-pack/react-simple-icons": "^13.13.0",
 		"@reatom/core": "^1001.3.0",
 		"@reatom/react": "^1001.0.1",
-		"@reatomized/convex": "^0.1.1",
+		"@reatomized/convex": "^0.3.0",
 		"better-auth": "1.6.33",
 		"convex": "1.48.0",
 		"idb-keyval": "^6.2.1",

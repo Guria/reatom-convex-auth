@@ -22,8 +22,6 @@ import {
 	betterAuthClient,
 	convex,
 	type AuthProviderId,
-	convexAuthStorageKeys,
-	convexAuthTransport,
 	createBetterAuthClient,
 } from '#shared/api'
 import {
@@ -31,6 +29,7 @@ import {
 	FAKE_CONVEX_SITE_URL,
 	fakeBetterAuthHandlers,
 	fakeConvexBackend,
+	fakeConvexHttpHandlers,
 } from '#shared/mocks/convexBackend'
 import { css } from '#styled-system/css'
 
@@ -51,7 +50,7 @@ const nativeHTMLElementFocus = globalThis.HTMLElement
 // — every story gets the full route set mocked by default, with individual
 // routes overridable via `msw.use(...)` in a story's `beforeEach`.
 async function setupMswWorker() {
-	const worker = setupWorker(...handlersArray, ...fakeBetterAuthHandlers)
+	const worker = setupWorker(...handlersArray, ...fakeConvexHttpHandlers, ...fakeBetterAuthHandlers)
 	await worker.start({
 		onUnhandledRequest: 'bypass',
 		quiet: true,
@@ -64,11 +63,17 @@ async function setupMswWorker() {
 
 const NO_NOTES: string[] = []
 const SEEDED_USER = { email: 'alex@example.com', password: 'correct-horse' }
-const convexAuthKeys = convexAuthStorageKeys('convexAuth')
-// Auth state persisted by the adapters; each story gets a new fake backend.
+// @convex-dev/auth's keys, under the namespace the session model passes.
+const convexAuthKeys = {
+	token: '__convexAuthJWT_convexAuth',
+	refreshToken: '__convexAuthRefreshToken_convexAuth',
+	verifier: '__convexAuthOAuthVerifier_convexAuth',
+}
+// Auth state persisted by the auth libraries; each story gets a new fake backend.
 const AUTH_STORAGE_KEYS = [
 	convexAuthKeys.token,
 	convexAuthKeys.refreshToken,
+	convexAuthKeys.verifier,
 	'better-auth_cookie',
 	'better-auth_session_data',
 	'authProvider',
@@ -113,8 +118,8 @@ function ReatomDecorator({
 		const client = backend.createClient()
 		const storyFrame = setupStorybookUrl(initialPath, () => {
 			convex.set(client)
-			convexAuthTransport.set(backend.convexAuth)
-			betterAuthClient.set(createBetterAuthClient(FAKE_CONVEX_SITE_URL))
+			const authClient = createBetterAuthClient(FAKE_CONVEX_SITE_URL)
+			betterAuthClient.set(() => () => authClient)
 			// Leaving for GitHub comes straight back, as if the user approved, to
 			// `/login/`: GitHub Pages answers `/login` with a 301 that adds the slash.
 			assignLocation.set(() => (url: string) => {

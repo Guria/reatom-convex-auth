@@ -176,9 +176,11 @@ Convex talks over a websocket that MSW cannot intercept, so each story gets an
 in-memory deployment (`src/shared/mocks/convexBackend.ts`) on a server that
 speaks Convex's websocket protocol (`packages/convex-fake-server`). The decorator puts
 a real `ConvexClient` connected to it into `convex.client`, plus
-`convexAuthTransport` and `betterAuthClient`, and closes the client when the
-story unmounts. better-auth still runs its real client: its HTTP endpoints are
-MSW handlers (`fakeBetterAuthHandlers`) backed by the same fake. The
+`betterAuthClient`, and closes the client when the story unmounts. Convex Auth
+signs in through the fake's `auth:signIn` and `auth:signOut` actions; its
+refresh exchange goes over HTTP to `fakeConvexHttpHandlers`. better-auth runs
+its real client against MSW handlers (`fakeBetterAuthHandlers`) backed by the
+same fake. The
 `seedNotes` parameter adds notes for the restored account.
 
 Assert on backend state that has no UI through `fakeConvexBackend.current`, for
