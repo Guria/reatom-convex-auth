@@ -37,6 +37,15 @@ jobs:
       - name: Install dependencies
         run: nub ci
 
+      - name: Install Playwright browsers
+        run: nub exec playwright install --with-deps chromium
+
+      - name: Run CI checks
+        run: mise run ci
+        env:
+          CI: true
+
+      # After the tests: CRAP scores need their coverage.
       - name: Run Fallow audit
         uses: fallow-rs/fallow@8c5618273a1c514abede395ba9cc1de37a158425 # v2.83.0
         with:
@@ -48,14 +57,7 @@ jobs:
           comment: true
           annotations: true
           artifacts-dir: .var/fallow
-
-      - name: Install Playwright browsers
-        run: nub exec playwright install --with-deps chromium
-
-      - name: Run CI checks
-        run: mise run ci
-        env:
-          CI: true
+          coverage: .var/coverage/coverage-final.json
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
