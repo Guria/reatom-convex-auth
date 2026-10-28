@@ -5,10 +5,10 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@convex-dev/auth>convex': https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
-  '@convex-dev/better-auth>convex': https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
-  convex-helpers>convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
-  convex-test>convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
+  '@convex-dev/auth>convex': 1.48.0
+  '@convex-dev/better-auth>convex': 1.48.0
+  convex-helpers>convex: 1.48.0
+  convex-test>convex: 1.48.0
 
 importers:
 
@@ -22,25 +22,28 @@ importers:
         version: 0.41.3
       '@convex-dev/auth':
         specifier: 0.0.96
-        version: 0.0.96(@auth/core@0.41.3)(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(react@19.3.1)
+        version: 0.0.96(@auth/core@0.41.3)(convex@1.48.0(react@19.3.1))(react@19.3.1)
       '@convex-dev/better-auth':
         specifier: 0.12.5
-        version: 0.12.5(@vitest/browser@4.1.10)(better-auth@1.6.33(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))))(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(typescript@6.0.2)
+        version: 0.12.5(@vitest/browser@4.1.10)(better-auth@1.6.33(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))))(convex@1.48.0(react@19.3.1))(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(typescript@6.0.2)
       '@icons-pack/react-simple-icons':
         specifier: ^13.13.0
         version: 13.15.1(react@19.3.1)
       '@reatom/core':
-        specifier: https://pkg.pr.new/@reatom/core@5f42184
-        version: https://pkg.pr.new/@reatom/core@5f42184
+        specifier: ^1001.3.0
+        version: 1001.3.0
       '@reatom/react':
-        specifier: https://pkg.pr.new/@reatom/react@5f42184
-        version: https://pkg.pr.new/@reatom/react@5f42184
+        specifier: ^1001.0.1
+        version: 1001.0.1(@reatom/core@1001.3.0)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))
+      '@reatomized/convex':
+        specifier: ^0.1.1
+        version: 0.1.1(@reatom/core@1001.3.0)(convex@1.48.0(react@19.3.1))
       better-auth:
         specifier: 1.6.33
         version: 1.6.33(@vitest/browser@4.1.10)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)))
       convex:
-        specifier: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
-        version: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
+        specifier: 1.48.0
+        version: 1.48.0(react@19.3.1)
       idb-keyval:
         specifier: ^6.2.1
         version: 6.3.0
@@ -119,7 +122,7 @@ importers:
         version: link:packages/convex-fake-server
       convex-test:
         specifier: 0.0.65
-        version: 0.0.65(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)
+        version: 0.0.65(convex@1.48.0(react@19.3.1))
       fallow:
         specifier: ^3.5.1
         version: 3.35.0
@@ -129,9 +132,6 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.64.1
-      reatom-convex-client:
-        specifier: workspace:*
-        version: link:packages/reatom-convex-client
       steiger:
         specifier: ^0.6.0
         version: 0.6.0(typescript@6.0.2)
@@ -2398,10 +2398,6 @@ packages:
   '@reatom/core@1001.3.0':
     resolution: {integrity: sha512-M8pZM6sWIQLIJZVaMI//tqadppk5GHV1MMjDZ0q5g3yxF1sXQs5ftgAxnitxAlP/ViwYWKxyrQI/8q1A3DeaNA==}
 
-  '@reatom/core@https://pkg.pr.new/@reatom/core@5f42184':
-    resolution: {integrity: sha512-KlUPxWvg5jBfywTQ7kXRUluDhyG3gqXWFU3YEBDdJLV+BEN3WMAYeaPYbxI3ZcwyGhyTkeg+SOaClLnTz12sZg==, tarball: https://pkg.pr.new/@reatom/core@5f42184}
-    version: 1001.3.0
-
   '@reatom/core@https://pkg.pr.new/@reatom/core@906602e':
     resolution: {integrity: sha512-zk/+ukCuAe+438mferK0Cjrh+W1xsvzFDn5ydEqqoGrZTPhWbXRgMuJHUETTaToSa2D2Pg8dXw0tXZWNdwxuGg==, tarball: https://pkg.pr.new/@reatom/core@906602e}
     version: 1001.3.0
@@ -2430,10 +2426,6 @@ packages:
       react: '>=18.2.0'
       react-dom: '>=18.2.0'
 
-  '@reatom/react@https://pkg.pr.new/@reatom/react@5f42184':
-    resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@5f42184}
-    version: 1001.0.1
-
   '@reatom/react@https://pkg.pr.new/@reatom/react@906602e':
     resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@906602e}
     version: 1001.0.1
@@ -2441,6 +2433,12 @@ packages:
   '@reatom/react@https://pkg.pr.new/@reatom/react@f967994':
     resolution: {integrity: sha512-J59LcqZhrjTuZugi1W64aCpdDHICvYxhae/6HZqzaliErPEVePrw4bssNs7CXhTTnFv671cJ7rFbUvyFjYLDUA==, tarball: https://pkg.pr.new/@reatom/react@f967994}
     version: 1001.0.1
+
+  '@reatomized/convex@0.1.1':
+    resolution: {integrity: sha512-3XKsVeHORa8bdd59vZ7R9Ab6qJl8C3IZ4qyiifGkdQDn5mZL+It4H5AunDHkNDc+EgQyp2Q0FIMY3PZEPH95tQ==}
+    peerDependencies:
+      '@reatom/core': ^1001.3.0
+      convex: ^1.48.0
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
     resolution: {integrity: sha512-aLcgK9gIJ3YRvrrtfSBbRa27F5WrpiTaPulnFpsHPxpUHgFlSgnU4854MHwoRGEBhfRJDWCS2WQ7lIjskE9Olw==}
@@ -3995,10 +3993,6 @@ packages:
         optional: true
       react:
         optional: true
-
-  convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz:
-    resolution: {integrity: sha512-rprs2beajy7sgfa3dfm0AoshbY6tiWY2XZeL82WaTbDMfKIuSowmFfncwtyV+873zXag0hrEUd3LvY5O/xNI+g==, tarball: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz}
-    version: 1.48.0
 
   cookie-es@1.2.3:
     resolution: {integrity: sha512-lXVyvUvrNXblMqzIRrxHb57UUVmqsSWlxqt3XIjCkUP0wDAf6uicO6KMbEgYrMNtEvWgWHwe42CKxPu9MYAnWw==}
@@ -6485,12 +6479,12 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@convex-dev/auth@0.0.96(@auth/core@0.41.3)(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(react@19.3.1)':
+  '@convex-dev/auth@0.0.96(@auth/core@0.41.3)(convex@1.48.0(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@auth/core': 0.41.3
       '@oslojs/crypto': 1.0.1
       '@oslojs/encoding': 1.1.0
-      convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
+      convex: 1.48.0(react@19.3.1)
       cookie: 1.1.1
       is-network-error: 1.3.2
       jose: 5.10.0
@@ -6501,13 +6495,13 @@ snapshots:
       react: 19.3.1
       server-only: 0.0.1
 
-  '@convex-dev/better-auth@0.12.5(@vitest/browser@4.1.10)(better-auth@1.6.33(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))))(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(typescript@6.0.2)':
+  '@convex-dev/better-auth@0.12.5(@vitest/browser@4.1.10)(better-auth@1.6.33(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0))))(convex@1.48.0(react@19.3.1))(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(typescript@6.0.2)':
     dependencies:
       '@better-fetch/fetch': 1.3.3
       better-auth: 1.6.33(@vitest/browser@4.1.10)(msw@2.15.0(typescript@6.0.2))(playwright@1.64.1)(react@19.3.1)(react-dom@19.3.1(react@19.3.1))(vitest@4.1.10(@edge-runtime/vm@5.0.0)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.10)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)))
       common-tags: 1.8.2
-      convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
-      convex-helpers: 0.1.129(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(react@19.3.1)(typescript@6.0.2)(zod@4.6.7)
+      convex: 1.48.0(react@19.3.1)
+      convex-helpers: 0.1.129(convex@1.48.0(react@19.3.1))(react@19.3.1)(typescript@6.0.2)(zod@4.6.7)
       jose: 6.2.13
       react: 19.3.1
       remeda: 2.53.0
@@ -7797,10 +7791,6 @@ snapshots:
     optionalDependencies:
       idb-keyval: 6.3.0
 
-  '@reatom/core@https://pkg.pr.new/@reatom/core@5f42184':
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-
   '@reatom/core@https://pkg.pr.new/@reatom/core@906602e':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -7828,11 +7818,14 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  '@reatom/react@https://pkg.pr.new/@reatom/react@5f42184': {}
-
   '@reatom/react@https://pkg.pr.new/@reatom/react@906602e': {}
 
   '@reatom/react@https://pkg.pr.new/@reatom/react@f967994': {}
+
+  '@reatomized/convex@0.1.1(@reatom/core@1001.3.0)(convex@1.48.0(react@19.3.1))':
+    dependencies:
+      '@reatom/core': 1001.3.0
+      convex: 1.48.0(react@19.3.1)
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
     optional: true
@@ -9458,31 +9451,22 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-helpers@0.1.129(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz)(react@19.3.1)(typescript@6.0.2)(zod@4.6.7):
+  convex-helpers@0.1.129(convex@1.48.0(react@19.3.1))(react@19.3.1)(typescript@6.0.2)(zod@4.6.7):
     dependencies:
-      convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
+      convex: 1.48.0(react@19.3.1)
       react: 19.3.1
       typescript: 6.0.2
       zod: 4.6.7
 
-  convex-test@0.0.65(convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz):
+  convex-test@0.0.65(convex@1.48.0(react@19.3.1)):
     dependencies:
-      convex: https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz
+      convex: 1.48.0(react@19.3.1)
 
   convex@1.48.0(react@19.3.1):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.2.5
       react: 19.3.1
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  convex@https://github.com/Guria/convex-js/releases/download/reatom-native-client-196e1a4/convex-1.48.0.tgz:
-    dependencies:
-      esbuild: 0.27.0
-      prettier: 3.2.5
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil

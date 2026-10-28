@@ -5,8 +5,8 @@
 // real backend issues (convex/auth.ts, convex/betterAuth.ts).
 import type { AuthProviderId, ConvexAuthTransport } from '#shared/api'
 
+import { reatomConvexClient } from '@reatomized/convex'
 import { createFakeConvexServer, fakeJwt, paginate, readFakeJwt } from 'convex-fake-server'
-import { reatomConvexClient } from 'convex/browser'
 import { ConvexError } from 'convex/values'
 import { http, HttpResponse } from 'msw'
 

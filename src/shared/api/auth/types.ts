@@ -1,5 +1,5 @@
 import type { AtomLike } from '@reatom/core'
-import type { AuthTokenFetcher } from 'convex/browser'
+import type { AuthTokenFetcher } from '@reatomized/convex'
 
 export const AUTH_PROVIDERS = ['convex-auth', 'better-auth'] as const
 export type AuthProviderId = (typeof AUTH_PROVIDERS)[number]

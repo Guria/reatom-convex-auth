@@ -1,5 +1,5 @@
 import { assert, atom } from '@reatom/core'
-import { reatomConvexClient } from 'convex/browser'
+import { reatomConvexClient } from '@reatomized/convex'
 
 import { createBetterAuthClient } from './auth/betterAuth'
 import { createConvexAuthTransport } from './auth/convexAuth'

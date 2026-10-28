@@ -4,10 +4,9 @@ An experiment in binding [Convex](https://convex.dev) to
 [Reatom](https://github.com/reatom/reatom) v1001, built on the
 [Karkas](https://github.com/apphane-dev/karkas) stack:
 
-- The app runs on `reatomConvexClient`, the Reatom build of `convex` from
-  [Guria/convex-js `reatom-native-client`](https://github.com/Guria/convex-js/blob/reatom-native-client/REATOM.md).
-  Queries, connection and auth state are atoms. See
-  [The Convex client](#the-convex-client).
+- The app runs on [`@reatomized/convex`](https://www.npmjs.com/package/@reatomized/convex),
+  the published Reatom client for `convex`. Queries, connection and auth state
+  are atoms. See [The Convex client](#the-convex-client).
 - `packages/reatom-convex`: a Reatom binding over the stock `ConvexClient`
   that covers what `convex/react` does. The bench measures it.
 - `packages/reatom-convex-client`: an experimental native Reatom websocket
@@ -153,15 +152,16 @@ and `convex/auth.config.ts` lists a single provider. better-auth is mounted at
 
 ## The Convex client
 
-`convex` comes from a
-[release tarball](https://github.com/Guria/convex-js/releases/tag/reatom-native-client-196e1a4)
-of the fork, which keeps the 1.48.0 API and adds `reatomConvexClient`.
-`src/shared/api/backend.ts` holds the client in the `convex` atom, so stories
-put a client connected to the fake server there. The fork takes `@reatom/core`
-as a peer, and the app pins the pkg.pr.new build the fork develops against, so
-the client's atoms live in the app's context. `overrides` in `package.json`
-give `@convex-dev/auth`, better-auth, `convex-helpers` and `convex-test` the
-same `convex`; the workspace packages keep npm `convex@1.48.0`.
+`reatomConvexClient` comes from the published
+[`@reatomized/convex`](https://www.npmjs.com/package/@reatomized/convex)
+package. `src/shared/api/backend.ts` holds the client in the `convex` atom, so
+stories put a client connected to the fake server there. The client takes
+`@reatom/core` as a peer, and the app runs the published `1001.3.0` build, so
+the client's atoms live in the app's context. It also peers `convex` and
+imports `convex/values` and `convex/server` from it, so `ConvexError` and
+function references are the app's own. `overrides` in
+`package.json` keep `@convex-dev/auth`, better-auth, `convex-helpers` and
+`convex-test` on the same `convex@1.48.0`.
 
 | convex/react                             | App                                                                      |
 | ---------------------------------------- | ------------------------------------------------------------------------ |
