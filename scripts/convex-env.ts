@@ -18,8 +18,16 @@ import {
 
 // An explicit `SITE_URL` replaces the stored one; without it the stored one stays.
 const siteUrl = process.env['SITE_URL']
-// `--prod` targets the production deployment of the configured project.
-const target = process.argv.includes('--prod') ? ['--prod'] : []
+// `--prod` targets the production deployment of the project that
+// CONVEX_DEPLOYMENT names. On the anonymous local deployment from `.env.local`
+// the CLI ignores it and writes to that deployment.
+const prod = process.argv.includes('--prod')
+const deployment = process.env['CONVEX_DEPLOYMENT']
+if (prod && (!deployment || deployment.startsWith('anonymous:'))) {
+	console.error('--prod needs CONVEX_DEPLOYMENT set to a cloud deployment, such as dev:<name>')
+	process.exit(1)
+}
+const target = prod ? ['--prod'] : []
 
 const convexEnv = (args: string[], input?: string) =>
 	execFileSync('nub', ['exec', 'convex', 'env', ...target, ...args], {
