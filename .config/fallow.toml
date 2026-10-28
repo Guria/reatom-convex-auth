@@ -1,7 +1,6 @@
 entry = [
 	"scripts/**/*.ts",
 	"packages/bench/run.ts",
-	"packages/bench/main.tsx",
 	"packages/bench/size/*.tsx",
 	# run.ts aliases @reatom/jsx's jsx-runtime to it.
 	"packages/bench/reatomJsxRuntime.ts",
@@ -9,9 +8,8 @@ entry = [
 # `@typescript/native`: TypeScript 7 compiler, not imported by source.
 # `idb-keyval`: optional dependency of @reatom/core. The Storybook/Vite optimizer
 # eagerly analyzes its dynamic import, so the package must remain resolvable.
-# `storybook`: imported by the kahraman actor harness but never runs in production.
 # `@ark-ui/react`: consumed by the excluded generated Park UI component sources.
-# Steiger and its FSD plugin are loaded by the excluded tooling config and mise task.
+# The Steiger FSD plugin is loaded by the excluded tooling config.
 # `zod`: pins zod 4 at the root of the hoisted tree; better-auth imports it
 # without declaring a nested copy, and steiger's zod 3 would win otherwise.
 ignoreDependencies = [
@@ -19,8 +17,6 @@ ignoreDependencies = [
 	"@feature-sliced/steiger-plugin",
 	"@typescript/native",
 	"idb-keyval",
-	"steiger",
-	"storybook",
 	"zod",
 ]
 
@@ -42,13 +38,10 @@ ignoreExports = [
 	{ file = "src/widgets/data-page/ui/NoSelectionState.tsx", exports = ["NoSelectionState"] },
 ]
 
-# Park UI and generated assets are committed vendor/generated code.
+# Committed Park UI components and recipes, and the Steiger config the FSD check loads.
 ignorePatterns = [
-	"public/mockServiceWorker.js",
 	"scripts/steiger/steiger.config.ts",
-	"src/paraglide/**",
 	"src/shared/components/ui/**",
-	"src/shared/styled-system/**",
 	"theme/recipes/**",
 ]
 

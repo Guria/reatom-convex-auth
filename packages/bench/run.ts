@@ -147,18 +147,36 @@ async function iteration(
 	return samples
 }
 
-// The bench CLI runs outside the test suite, so it has no coverage.
-// fallow-ignore-next-line complexity
+const slot = <T>(map: Record<string, T>, key: string, empty: () => T) => (map[key] ??= empty())
+
 const record = (
 	results: Results,
 	samples: Array<{ label: string; byName: Record<string, Sample> }>,
 ) => {
 	for (const { label, byName } of samples)
 		for (const [name, sample] of Object.entries(byName))
-			((results[name] ??= {})[label] ??= []).push(sample)
+			slot(
+				slot(results, name, () => ({})),
+				label,
+				(): Sample[] => [],
+			).push(sample)
 }
 
-// fallow-ignore-next-line complexity
+/** One iteration of both workloads; the first column and the workload order rotate. */
+async function round(
+	page: Page,
+	index: number,
+	scenarios: string[],
+	errors: string[],
+	results: Record<(typeof workloads)[number], Results>,
+) {
+	const order = index % 2 ? [...workloads].reverse() : workloads
+	for (const workload of order) {
+		const samples = await iteration(page, index % COLUMNS.length, scenarios, errors, workload)
+		if (index >= config.warmup) record(results[workload], samples)
+	}
+}
+
 async function runtime() {
 	const { browser, page, errors, close } = await openPage()
 	try {
@@ -169,14 +187,9 @@ async function runtime() {
 			'per-message': {},
 			coalesced: {},
 		}
-		// The first column and the workload order rotate; warmup samples are dropped.
-		for (let index = 0; index < config.warmup + config.iterations; index++) {
-			const order = index % 2 ? [...workloads].reverse() : workloads
-			for (const workload of order) {
-				const samples = await iteration(page, index % COLUMNS.length, scenarios, errors, workload)
-				if (index >= config.warmup) record(results[workload], samples)
-			}
-		}
+		// Warmup rounds come first and record nothing.
+		for (let index = 0; index < config.warmup + config.iterations; index++)
+			await round(page, index, scenarios, errors, results)
 		return { results, browserVersion: browser.version() }
 	} finally {
 		await close()
