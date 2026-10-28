@@ -47,9 +47,9 @@ jobs:
 
       # After the tests: CRAP scores need their coverage.
       - name: Run Fallow audit
-        uses: fallow-rs/fallow@8c5618273a1c514abede395ba9cc1de37a158425 # v2.83.0
+        uses: fallow-rs/fallow@3c6e45b55ae60a52caa2b586ea3fae44f3e5a44e # v3.36.0
         with:
-          version: 2.83.0
+          version: 3.36.0
           command: audit
           config: .config/fallow.toml
           format: json
