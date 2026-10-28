@@ -1,9 +1,8 @@
 // Runtime benchmark: the same scenarios for each binding, each run on a fresh
-// fake server, client and container. `run.ts` builds this page once per Reatom
-// build in production mode and drives `window.bench` from Playwright.
+// fake server, client and container. `run.ts` builds this page in production
+// mode and drives `window.bench` from Playwright.
 import { clearStack, VERSION } from '@reatom/core'
 
-import { runActionProbe } from './actionProbe'
 import {
 	counters,
 	createBenchServer,
@@ -14,32 +13,9 @@ import {
 	type Binding,
 	type Handle,
 } from './fixture'
-import {
-	official,
-	officialAtoms,
-	officialPatched,
-	officialBatched,
-	officialRewrite,
-} from './official'
-import { plainPr, plainNative } from './plainReact'
-import {
-	reatom,
-	reatomAtoms,
-	reatomAtomsApi,
-	reatomNative,
-	reatomPatched,
-	reatomBatched,
-	reatomRewrite,
-} from './reatom'
-import {
-	reatomJsx,
-	reatomJsxNative,
-	reatomJsxPatched,
-	reatomJsxBatched,
-	reatomJsxRewrite,
-	reatomJsxAtoms,
-	reatomJsxAtomsApi,
-} from './reatomJsx'
+import { official } from './official'
+import { reatom } from './reatom'
+import { reatomJsx } from './reatomJsx'
 
 // The app's strict context: Reatom code runs only inside a frame.
 clearStack()
@@ -47,46 +23,19 @@ clearStack()
 type Config = {
 	items: number
 	queryResponses: 'per-message' | 'coalesced'
-	batchQuerySet: boolean
 }
 type Sample = { ms: number; renders: number; commits: number; transitions?: number }
 
-export const allBindings = [
-	plainPr,
-	plainNative,
-	official,
-	officialBatched,
-	officialRewrite,
-	officialAtoms,
-	reatomAtoms,
-	reatomAtomsApi,
-	reatomJsxAtoms,
-	reatomJsxAtomsApi,
-	reatomBatched,
-	reatomRewrite,
-	reatomJsxBatched,
-	reatomJsxRewrite,
-	officialPatched,
-	reatom,
-	reatomNative,
-	reatomPatched,
-	reatomJsx,
-	reatomJsxNative,
-	reatomJsxPatched,
-]
+const allBindings = [official, reatom, reatomJsx]
 
 const settle = (server: BenchServer) => server.server.settled()
 
-export async function session<T>(
-	binding: Binding,
-	config: Config,
-	run: (ctx: Context) => Promise<T>,
-) {
+async function session<T>(binding: Binding, config: Config, run: (ctx: Context) => Promise<T>) {
 	const server = createBenchServer(config.queryResponses)
 	// @reatom/jsx observes the container's parent, so it is attached first.
 	const container = document.createElement('div')
 	document.body.append(container)
-	const instance = binding.create(server, container, { batchQuerySet: config.batchQuerySet })
+	const instance = binding.create(server, container)
 	try {
 		const deadline = performance.now() + 10_000
 		while (!instance.connected()) {
@@ -109,7 +58,7 @@ export async function session<T>(
 type Context = { server: BenchServer; instance: BenchInstance; container: HTMLElement }
 
 /** Times `act` until `done`, counting renders and commits. */
-export async function measure(
+async function measure(
 	container: Element,
 	act: () => void,
 	done: Parameters<typeof until>[1],
@@ -236,7 +185,6 @@ export const bench = {
 	version: VERSION,
 	scenarios: Object.keys(allScenarios),
 	run: runOnce,
-	actionProbe: runActionProbe,
 }
 
 /** What `run.ts` calls as `window.bench`. */

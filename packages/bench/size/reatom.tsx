@@ -1,4 +1,4 @@
-import { frame, onClick, summary } from './bindingApp'
+import { frame, onClick, summary } from './app'
 import { renderSizeApp } from './reactView'
 
 renderSizeApp(frame, onClick, summary)

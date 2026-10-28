@@ -1,35 +1,31 @@
-// The app every Reatom size build renders, over either client's API.
-import type { reatomConvex } from 'reatom-convex'
-
-import { wrap, type Frame } from '@reatom/core'
+// The size apps' models over @reatomized/convex, whatever renders them.
+import { clearStack, computed, context, wrap } from '@reatom/core'
+import { reatomConvexClient } from '@reatomized/convex'
 
 import { addNoteFirst, api } from '../api'
 
-type Convex = Pick<
-	ReturnType<typeof reatomConvex>,
-	'query' | 'mutation' | 'paginatedQuery' | 'setAuth' | 'serverAuthenticated' | 'isRefreshingAuth'
-> & { connectionState: () => { isWebSocketConnected: boolean } }
+clearStack()
+export const frame = context.start()
+const convex = reatomConvexClient('https://bench.convex.cloud', {}, 'convexClient')
+const item = computed(
+	() => (convex.isAuthenticated() ? convex.query(api.item, { id: 1 }).data() : undefined),
+	'item',
+)
+const pages = frame.run(() => convex.paginatedQuery(api.page, {}, { initialNumItems: 10 }))
+frame.run(() => convex.setAuth(async () => 'token'))
 
-export function sizeApp(convex: Convex, frame: Frame) {
-	const item = convex.query(
-		api.item,
-		() => (convex.serverAuthenticated() ? { id: 1 } : 'skip'),
-		'item',
-	)
-	const add = convex.mutation(api.add, 'add', { optimisticUpdate: addNoteFirst })
-	const pages = convex.paginatedQuery(api.page, () => ({}), { initialNumItems: 10 }, 'pages')
-	frame.run(() => convex.setAuth(async () => 'token'))
-	return {
-		/** Adds a note, then loads another page. */
-		onClick: () => void add({ text: 'x' }).then(wrap(() => pages.loadMore(10))),
-		/** Reads every piece of state the app shows. */
-		summary: () =>
-			JSON.stringify([
-				convex.serverAuthenticated(),
-				convex.isRefreshingAuth(),
-				convex.connectionState().isWebSocketConnected,
-				item.data(),
-				pages.results(),
-			]),
-	}
-}
+/** Adds a note, then loads another page. */
+export const onClick = () =>
+	void frame
+		.run(() => convex.mutation(api.add, { text: 'x' }, { optimisticUpdate: addNoteFirst }))
+		.then(wrap(() => pages.loadMore(10), frame))
+
+/** Reads every piece of state the app shows. */
+export const summary = () =>
+	JSON.stringify([
+		convex.isAuthenticated(),
+		convex.isRefreshingAuth(),
+		convex.connectionState().isWebSocketConnected,
+		item(),
+		pages.results(),
+	])

@@ -1,22 +1,12 @@
 /** @jsxImportSource @reatom/jsx */
 // @reatom/jsx has no keyed reconciliation: `key` would be an unused prop.
 // oxlint-disable react/jsx-key
-// The same binding rendered by @reatom/jsx: real DOM nodes, no virtual DOM.
+// The same models rendered by @reatom/jsx: real DOM nodes, no virtual DOM.
 // Components run once; bound values update the DOM directly.
 import { mount } from '@reatom/jsx'
 
-import { counters, type Binding, type BenchServer, type ModelOptions, type Note } from './fixture'
-import {
-	atomsApiModels,
-	atomsModels,
-	batchedModels,
-	rewrittenModels,
-	nativeModels,
-	patchedModels,
-	reatomModels,
-	type ItemModel,
-	type ReatomModels,
-} from './reatomModels'
+import { counters, type Binding, type Note } from './fixture'
+import { reatomModels, type ItemModel } from './reatomModels'
 
 const Item = ({ id, model }: { id: number; model: ItemModel }) => (
 	<i
@@ -34,14 +24,11 @@ const Notes = ({ notes }: { notes: () => Note[] }) => (
 	<ul>{() => notes().map((note) => <li>{note.text}</li>)}</ul>
 )
 
-const jsxBinding = (
-	label: string,
-	createModels: (server: BenchServer, options: ModelOptions) => ReatomModels,
-): Binding => ({
-	label,
+export const reatomJsx: Binding = {
+	label: '@reatom/jsx',
 	commits: false,
-	create(server, container, options) {
-		const models = createModels(server, options)
+	create(server, container) {
+		const models = reatomModels(server)
 		let unmount: (() => void) | undefined
 		const show = (build: () => Element) =>
 			models.frame.run(() => {
@@ -82,13 +69,4 @@ const jsxBinding = (
 			},
 		}
 	},
-})
-
-export const reatomJsx = jsxBinding('@reatom/jsx', reatomModels)
-export const reatomJsxNative = jsxBinding('@reatom/jsx native', nativeModels)
-export const reatomJsxPatched = jsxBinding('@reatom/jsx patched', patchedModels)
-
-export const reatomJsxBatched = jsxBinding('@reatom/jsx TS patch', batchedModels)
-export const reatomJsxRewrite = jsxBinding('@reatom/jsx Reatom SDK', rewrittenModels)
-export const reatomJsxAtoms = jsxBinding('@reatom/jsx Atoms SDK', atomsModels)
-export const reatomJsxAtomsApi = jsxBinding('@reatom/jsx Atoms SDK API', atomsApiModels)
+}

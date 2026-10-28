@@ -39,10 +39,7 @@ export default defineConfig({
 			// convex:smoke`; the app-owned function logic is unit-tested here.
 			include: [
 				'src/**/*.{ts,tsx}',
-				'packages/reatom-convex/src/**/*.ts',
-				'packages/reatom-convex-client/src/**/*.ts',
 				'packages/convex-fake-server/src/**/*.ts',
-				'packages/convex-patched/src/**/*.ts',
 				'convex/notes.ts',
 				'convex/viewer.ts',
 			],
@@ -61,7 +58,6 @@ export default defineConfig({
 				test: {
 					name: 'benchmark',
 					include: ['packages/bench/*.test.ts'],
-					exclude: ['packages/bench/*.node.test.ts'],
 					browser: {
 						enabled: true,
 						headless: true,
@@ -74,11 +70,7 @@ export default defineConfig({
 				extends: true,
 				test: {
 					name: 'unit',
-					include: [
-						'src/**/*.test.{ts,tsx}',
-						'packages/*/src/**/*.test.ts',
-						'packages/bench/*.node.test.ts',
-					],
+					include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.ts'],
 					exclude: ['src/**/*.stories.tsx'],
 					testTimeout: testTimeout,
 					hookTimeout: testTimeout,

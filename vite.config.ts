@@ -84,11 +84,6 @@ export default defineConfig({
 			'vite-plus/prefer-vite-plus-imports': 'error',
 		},
 		overrides: [
-			// These two benchmark consumers deliberately test ordinary React without Reatom hooks.
-			{
-				files: ['packages/bench/plainReact.tsx', 'packages/bench/size/plain-react.tsx'],
-				rules: { 'eslint/no-restricted-imports': 'off' },
-			},
 			{
 				files: ['**/shared/components/ui/**'],
 				rules: {

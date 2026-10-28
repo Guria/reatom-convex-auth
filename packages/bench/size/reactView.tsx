@@ -1,4 +1,4 @@
-// Identical renderer for the binding and native size builds.
+// The @reatom/react renderer of the size app.
 import { wrap, type Frame } from '@reatom/core'
 import { reatomComponent, reatomContext } from '@reatom/react'
 import { createRoot } from 'react-dom/client'

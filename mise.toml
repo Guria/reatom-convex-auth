@@ -168,50 +168,23 @@ run = "nub scripts/convex-env.ts ${usage_prod:+--prod}"
 description = "Sign up with both auth providers against the running Convex backend"
 run = "nub scripts/convex-smoke.ts"
 
-[tasks."convex:smoke:native"]
-description = "Check the native websocket client with both providers on the local backend"
-run = "nub scripts/convex-smoke.ts --native"
+[tasks."convex:smoke:websocket"]
+description = "Check @reatomized/convex over the websocket with both providers on the local backend"
+run = "nub scripts/convex-smoke.ts --websocket"
 
 [tasks."e2e:real"]
 description = "Browser journeys for both providers against the running app and Convex backend"
 run = "nub scripts/real-backend-e2e.ts"
 
 [tasks.bench]
-description = "Benchmark convex/react, the Reatom binding, and the native client"
+description = "Benchmark convex/react against @reatomized/convex"
 usage = '''
 flag "--items <n>" default="1000" help="Components in many-component scenarios"
 flag "--iterations <n>" default="15" help="Measured iterations per scenario"
 flag "--warmup <n>" default="3" help="Unmeasured iterations first"
-flag "--write" help="Save the report and raw samples in packages/bench"
-flag "--matched" help="Compare the matched upstream base with the safe patches"
-flag "--native" help="Compare the binding with the native client on stable Reatom"
-flag "--unbatched" help="Disable native query-set batching for a matched-message control"
-flag "--artifacts" help="Compare verified tarballs from the Convex fork threads"
-flag "--probe-action" help="Run artifact columns with the matched action-log core artifacts"
-flag "--probe-abort" help="Run artifact columns on the matched Reatom abort-hook pair"
-flag "--patched" help="Add convex/react and the binding on the patched convex SDK"
+flag "--write" help="Save the report to packages/bench/RESULTS.md"
 '''
-run = "nub packages/bench/run.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write} ${usage_matched:+--matched} ${usage_native:+--native} ${usage_unbatched:+--unbatched} ${usage_patched:+--patched} ${usage_artifacts:+--artifacts} ${usage_probe_abort:+--probe-abort} ${usage_probe_action:+--probe-action}"
-
-[tasks."bench:full"]
-description = "Compare PR #211 with the Reatom-native SDK across scale, APIs and renderers"
-usage = '''
-flag "--sizes <list>" default="10,100,1000,5000" help="Comma-separated query counts"
-flag "--iterations <n>" default="25" help="Measured iterations per scenario"
-flag "--warmup <n>" default="5" help="Unmeasured iterations per size"
-flag "--write" help="Save the report, HTML and compressed raw samples"
-'''
-run = "nub packages/bench/full.ts --sizes ${usage_sizes?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
-
-[tasks."bench:plain"]
-description = "Compare non-Reatom consumers over native atoms with PR 211 and compatibility controls"
-usage = '''
-flag "--sizes <list>" default="10,100,1000,5000" help="Comma-separated query counts"
-flag "--iterations <n>" default="25" help="Measured iterations per scenario"
-flag "--warmup <n>" default="5" help="Unmeasured iterations per size"
-flag "--write" help="Save the report, HTML and compressed raw samples"
-'''
-run = "nub packages/bench/full.ts --plain --sizes ${usage_sizes?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
+run = "nub packages/bench/run.ts --items ${usage_items?} --iterations ${usage_iterations?} --warmup ${usage_warmup?} ${usage_write:+--write}"
 
 [tasks.storybook]
 description = "Start Storybook dev server"

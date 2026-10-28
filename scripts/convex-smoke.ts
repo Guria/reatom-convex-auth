@@ -2,11 +2,11 @@
 // (`mise run convex:dev`). Reads VITE_CONVEX_URL / VITE_CONVEX_SITE_URL from
 // .env.local.
 import { clearStack, context } from '@reatom/core'
+import { reatomConvexClient } from '@reatomized/convex'
 import { ConvexHttpClient } from 'convex/browser'
 import { readFileSync } from 'node:fs'
 
 import { api } from '../convex/_generated/api.js'
-import { reatomConvex, reatomConvexClient } from '../packages/reatom-convex-client/src/index.js'
 
 const env = Object.fromEntries(
 	readFileSync('.env.local', 'utf8')
@@ -20,10 +20,10 @@ const siteUrl = env['VITE_CONVEX_SITE_URL']
 if (!url || !siteUrl) throw new Error('.env.local lacks VITE_CONVEX_URL / VITE_CONVEX_SITE_URL')
 
 if (
-	process.argv.includes('--native') &&
+	process.argv.includes('--websocket') &&
 	!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)
 ) {
-	throw new Error('The native smoke check only writes to a local deployment')
+	throw new Error('The websocket smoke check only writes to a local deployment')
 }
 
 const stamp = Date.now()
@@ -108,24 +108,19 @@ check(
 )
 console.log('smoke: all checks passed')
 
-// Native websocket protocol check; the HTTP checks above also prove isolation.
-if (process.argv.includes('--native')) {
+// The app's websocket client, @reatomized/convex; the HTTP checks above also
+// prove isolation.
+if (process.argv.includes('--websocket')) {
 	clearStack()
 	const frame = context.start()
-	const client = reatomConvexClient(url, { unsavedChangesWarning: false }, 'smoke.client')
-	const convex = reatomConvex(() => client, 'smoke')
-	const viewer = convex.query(api.viewer.current, () => ({}), 'smoke.viewer')
-	const pages = convex.paginatedQuery(
-		api.notes.list,
-		() => ({}),
-		{ initialNumItems: 1 },
-		'smoke.pages',
-	)
+	const convex = reatomConvexClient(url, { unsavedChangesWarning: false }, 'smoke.client')
+	const viewer = frame.run(() => convex.query(api.viewer.current, {}))
+	const pages = frame.run(() => convex.paginatedQuery(api.notes.list, {}, { initialNumItems: 1 }))
 	const unsubscribe = frame.run(() => viewer.data.subscribe(() => {}))
 	const waitFor = async (predicate: () => boolean) => {
 		const deadline = Date.now() + 15_000
 		while (!frame.run(predicate)) {
-			if (Date.now() > deadline) throw new Error('Native client smoke timed out')
+			if (Date.now() > deadline) throw new Error('Websocket smoke timed out')
 			await new Promise((resolve) => setTimeout(resolve, 10))
 		}
 	}
@@ -137,43 +132,36 @@ if (process.argv.includes('--native')) {
 			['better-auth', baToken],
 		] as const) {
 			frame.run(() => convex.setAuth(async () => token))
-			await waitFor(
-				() => convex.serverAuthenticated() === true && viewer.data()?.provider === provider,
-			)
-			check(true, `native websocket accepts ${provider} token`)
-			await frame.run(() =>
-				convex.mutation(api.notes.add, 'smoke.seed')({ text: `seed ${provider}` }),
-			)
+			await waitFor(() => convex.isAuthenticated() === true && viewer.data()?.provider === provider)
+			check(true, `websocket accepts ${provider} token`)
+			await frame.run(() => convex.mutation(api.notes.add, { text: `seed ${provider}` }))
 			stopPages = frame.run(() => pages.results.subscribe(() => {}))
 			await waitFor(() => pages.status() === 'CanLoadMore' || pages.status() === 'Exhausted')
 			check(
 				frame.run(() => pages.loadMore(1)),
-				`native ${provider} starts a second page`,
+				`websocket ${provider} starts a second page`,
 			)
 			await waitFor(() => pages.results().length === 2)
-			const text = `native ${provider}`
-			await frame.run(() => convex.mutation(api.notes.add, 'smoke.add')({ text }))
+			const text = `websocket ${provider}`
+			await frame.run(() => convex.mutation(api.notes.add, { text }))
 			await waitFor(() => pages.results().some((note) => note.text === text))
-			check(true, `native ${provider} mutation is visible in a live page`)
+			check(true, `websocket ${provider} mutation is visible in a live page`)
 			stopPages()
 			frame.run(() => convex.clearAuth())
 			await waitFor(() => viewer.data() === null)
 		}
-		// Use a native websocket action to obtain another real token.
+		// A websocket action obtains another real token.
 		const signedIn = await frame.run(() =>
-			convex.action(
-				api.auth.signIn,
-				'smoke.signIn',
-			)({
+			convex.action(api.auth.signIn, {
 				provider: 'password',
-				params: { email: `ca-native-${stamp}@example.com`, password, flow: 'signUp' },
+				params: { email: `ca-ws-${stamp}@example.com`, password, flow: 'signUp' },
 			}),
 		)
-		check(signedIn.tokens?.token, 'native websocket action returns a real JWT')
+		check(signedIn.tokens?.token, 'websocket action returns a real JWT')
 	} finally {
 		stopPages()
 		unsubscribe()
-		await frame.run(() => client.close())
+		await frame.run(() => convex.close())
 	}
-	console.log('native smoke: all checks passed')
+	console.log('websocket smoke: all checks passed')
 }

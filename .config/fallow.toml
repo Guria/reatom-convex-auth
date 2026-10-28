@@ -2,12 +2,7 @@ entry = [
 	"scripts/**/*.ts",
 	"packages/bench/run.ts",
 	"packages/bench/main.tsx",
-	"packages/bench/full.ts",
-	"packages/bench/fullMain.ts",
-	# The size build substitutes this module through its Vite resolver.
-	"packages/bench/plainPrSize.ts",
 	"packages/bench/size/*.tsx",
-	"packages/bench/reatomJsxRuntime.ts",
 ]
 # `@typescript/native`: TypeScript 7 compiler, not imported by source.
 # `idb-keyval`: optional dependency of @reatom/core. The Storybook/Vite optimizer
@@ -25,10 +20,6 @@ ignoreDependencies = [
 	"steiger",
 	"storybook",
 	"zod",
-	# Bench aliases that packages/bench/artifacts.ts resolves to fork tarballs.
-	"convex-artifact-batched",
-	"convex-artifact-rewrite",
-	"convex-artifact-atoms",
 ]
 
 # The skeleton keeps these shared extension points even when its starter screens do not
@@ -51,9 +42,6 @@ ignoreExports = [
 
 # Park UI and generated assets are committed vendor/generated code.
 ignorePatterns = [
-	# Only install alternative Reatom builds; the benchmark resolves them by path.
-	"packages/reatom-base/**",
-	"packages/reatom-next/**",
 	"public/mockServiceWorker.js",
 	"scripts/steiger/steiger.config.ts",
 	"src/paraglide/**",
@@ -62,7 +50,7 @@ ignorePatterns = [
 	"theme/recipes/**",
 ]
 
-# Give the Convex libraries the app's fork of `convex`. Fallow reads pnpm
+# Pin the Convex libraries' `convex` to the app's. Fallow reads pnpm
 # lockfiles, not nub.lock, so it cannot see them applied.
 ignoreDependencyOverrides = [
 	{ package = "@convex-dev/auth>convex" },
@@ -72,11 +60,5 @@ ignoreDependencyOverrides = [
 ]
 
 [duplicates]
-ignore = [
-	"messages/**",
-	"src/**/*.stories.tsx",
-	# The experiment deliberately matches the binding's public API without
-	# coupling the clients. Its query state adapters share that boilerplate.
-	"packages/reatom-convex-client/src/reatomConvex.ts",
-]
+ignore = ["messages/**", "src/**/*.stories.tsx"]
 ignoreImports = true

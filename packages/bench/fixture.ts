@@ -66,12 +66,9 @@ export type BenchInstance = {
 	close(): Promise<void>
 }
 
-/** Client options a run passes to every binding; `convex/react` ignores them. */
-export type ModelOptions = { batchQuerySet: boolean }
-
 export type Binding = {
 	label: string
 	/** Whether React commits are counted. */
 	commits: boolean
-	create(server: BenchServer, container: HTMLElement, options: ModelOptions): BenchInstance
+	create(server: BenchServer, container: HTMLElement): BenchInstance
 }
