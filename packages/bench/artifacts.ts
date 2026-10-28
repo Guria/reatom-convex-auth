@@ -141,6 +141,9 @@ export function artifactPlugin(artifacts: SdkArtifact[], override?: SdkArtifact[
 	return {
 		name: 'convex-thread-artifacts',
 		enforce: 'pre',
+		// Bench-only tarball resolver; the override switch is simpler than a
+		// coverage test would be.
+		// fallow-ignore-next-line complexity
 		async resolveId(source) {
 			const target = artifactImport(source, override)
 			if (!target) return
